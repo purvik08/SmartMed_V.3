@@ -291,40 +291,7 @@ SmartMed is engineered for widespread scalability across key environments:
 
 ---
 
-## Slide 7 — BILL OF MATERIALS (BOM) & UNIT ECONOMICS
-
-### Estimated Cost Breakdown (6-Slot Production Kiosk)
-
-| Component | Specification / Part | Qty | Estimated Cost (INR) |
-|---|---|:---:|:---:|
-| **Central Controller** | Espressif ESP32-S3 (Dual-Core, Wi-Fi/BLE) | 1 | ₹850 |
-| **Cellular IoT Modem** | 4G LTE-M / NB-IoT Cellular Module (SIM7080G / SIM7600) | 1 | ₹1,400 |
-| **User Interface Display** | 3.5-inch SPI TFT Touchscreen Display | 1 | ₹1,100 |
-| **Dispensing Actuators** | 12V High-Torque Geared BO Motors | 6 | ₹1,200 |
-| **Dispensing Coils** | Custom Precision Spring Helical Coils (PVC/Steel) | 6 | ₹600 |
-| **Motor Drivers** | Multi-Channel H-Bridge Motor Driver Boards (ULN2003 / L298N) | 2 | ₹350 |
-| **Cycle Feedback Sensors** | Precision Roller Micro-Limit Switches | 6 | ₹250 |
-| **Delivery Verification** | Dual Optical IR Break-Beam Curtain Sensors (Drop Verification) | 1 set | ₹450 |
-| **Power Management** | 12V 5A Industrial Power Supply + Li-ion Battery Backup Buffer | 1 | ₹1,800 |
-| **Chassis & Security** | Powder-Coated Sheet Metal / Heavy-Duty Enclosure & Electronic Solenoid Lock | 1 | ₹3,200 |
-| **Internal Cabling & Misc.** | Wiring harnesses, voltage regulators, fuse protection, terminal blocks | 1 set | ₹700 |
-| **Total Hardware Manufacturing Cost** | **Complete SmartMed 6-Slot Kiosk** | — | **~₹11,900** |
-
----
-
-### Economic Viability Comparison
-
-| Metric / Parameter | Imported Commercial Vending Machine | 24/7 Staffed Rural Pharmacy | SmartMed IoT Solution |
-|---|:---:|:---:|:---:|
-| **Initial Capital Expenditure (CapEx)** | ₹1,50,000 – ₹3,50,000 | ₹5,00,000 – ₹10,00,000 | **₹15,000 – ₹25,000** |
-| **Monthly Operating Overhead (OpEx)** | ₹8,000 – ₹15,000 (Electricity & maintenance) | ₹40,000 – ₹70,000 (Pharmacist salaries & rent) | **< ₹2,500** (Cloud hosting, SIM & power) |
-| **Clinical Supervision** | None (Unregulated retail snacks/OTC) | In-person (Subject to pharmacist availability) | **Integrated 24/7 Remote Telemedicine Pool** |
-| **Inventory Waste Prevention** | Manual stock checks | High (Overstocking & manual expiry disposal) | **Zero-Waste automated FEFO algorithm** |
-| **Deployment Footprint** | Large & heavy floor-standing | Requires full shop space | **Compact wall-mountable or tabletop footprint** |
-
----
-
-## Slide 8 — LIVE DEMONSTRATION & PITCH WALKTHROUGH SCRIPT
+## APPENDIX A — LIVE DEMONSTRATION & PITCH WALKTHROUGH SCRIPT
 
 *(5-Minute Step-by-Step Judge / Evaluator Walkthrough)*
 
@@ -362,7 +329,7 @@ SmartMed is engineered for widespread scalability across key environments:
 
 ---
 
-## Slide 9 — ANTICIPATED JURY Q&A & EVALUATOR DEFENSE MATRIX
+## APPENDIX B — ANTICIPATED JURY Q&A & EVALUATOR DEFENSE MATRIX
 
 ### High-Impact Answers for Presentation Defense
 

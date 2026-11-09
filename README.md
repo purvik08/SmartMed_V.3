@@ -1,16 +1,19 @@
 # SmartMed
 
-> **Offline-first medicine-access prototype for supervised dispensing.**
+> **Internet-Connected Autonomous Medicine Dispensing & Telemedicine Ecosystem**  
+> *Featuring a Fully Functional Offline Prototype & Local Validation Testbed*
 
-SmartMed is a local-network prototype that connects an Android application, a clinical review workflow, pharmacy operations, and a medicine-dispensing machine. It explores how essential over-the-counter (OTC), prescription, and time-sensitive emergency medicine workflows could be coordinated where reliable internet access is limited or unavailable.
+SmartMed is a next-generation healthcare technology ecosystem designed to bridge the last-mile medicine access gap. It pairs an IoT-enabled smart physical dispensing kiosk with a cloud-connected telemedicine and clinical governance platform. Connected via high-speed cellular IoT (4G/5G) and cloud microservices, SmartMed provides round-the-clock, supervised access to essential over-the-counter (OTC) medicines, verified physician-prescribed drugs, and time-critical emergency treatments.
 
-The project runs on a laptop and a private Wi-Fi network or phone hotspot. It does not require cloud hosting, Docker, an external database, SMS, map services, or installed Node packages at runtime.
+### Architecture Evolution: Main Product vs. Local Prototype
+- **The Main Commercial Product:** Designed as a nationwide, internet-connected healthcare network. Smart physical kiosks connect over 4G/5G cellular IoT and MQTT over TLS to cloud microservices (AWS/GCP), live teleconsultation pools with verified doctors, online UPI/card payment gateways, centralized pharmacy inventory management, optical drop-verification sensors, and national health mission frameworks (ABDM / ABHA).
+- **This Repository (Offline Prototype Testbed):** This codebase contains the **fully functional, verified offline-first prototype and simulation testbed**. It runs on a local computer and a private Wi-Fi network or phone hotspot, requiring zero external cloud dependencies, Docker, external databases, SMS costs, or runtime npm packages. It validates the exact mechanical state machine, multi-tier clinical safety rules, two-phase QR authentication, and jam recovery workflows locally before mass IoT hardware deployment.
 
 ## Important safety and scope notice
 
-SmartMed is a **demonstration prototype**, not a medical device, pharmacy system, emergency service, payment product, or clinical decision-support system. It must not be used to diagnose, prescribe, dispense, or administer real medicines. Use sealed empty boxes or placebos only during demonstrations.
+SmartMed is currently implemented here as a **demonstration prototype and testing testbed**, not a certified medical device, pharmacy system, emergency service, payment product, or clinical decision-support system. It must not be used to diagnose, prescribe, dispense, or administer real medicines. Use sealed empty boxes or placebos only during demonstrations.
 
-Its seeded medicine catalogue, prices, dosage text, age limits, allergy tags, and emergency formulary are illustrative. Any real deployment would require clinical governance, licensed pharmacy participation, pharmacist and physician review, regulatory approval, validated hardware, security testing, accessibility assessment, real authentication and payment integrations, and local legal compliance.
+Its seeded medicine catalogue, prices, dosage text, age limits, allergy tags, and emergency formulary are illustrative. Any commercial deployment will require clinical governance, licensed pharmacy participation, pharmacist and physician review, regulatory approval, validated hardware, security testing, accessibility assessment, real authentication and payment integrations, and local legal compliance.
 
 ## Contents
 
@@ -32,11 +35,11 @@ Its seeded medicine catalogue, prices, dosage text, age limits, allergy tags, an
 
 SmartMed demonstrates a controlled last-mile medicine-access model with five goals:
 
-1. **Local resilience** — keep the essential workflow available over a local network when public internet connectivity is unreliable.
-2. **Appropriate access** — distinguish routine OTC access from prescription-only and emergency pathways.
-3. **Human clinical oversight** — route prescription and emergency decisions through a verified doctor role in the prototype.
-4. **Traceable dispensing** — record the order, payment state, stock lane, dispensing event, refund outcome, and audit event.
-5. **Operational readiness** — give a worker role tools to inspect lanes, refill stock with batch/expiry information, and register machines.
+1. **Seamless Healthcare Access** — provide 24/7 access to essential medicines and remote doctor consultations in rural areas, transit hubs, and corporate/academic campuses.
+2. **Appropriate Multi-Tier Access** — distinguish routine OTC access from prescription-only and emergency pathways with strict regulatory isolation.
+3. **Human Clinical Oversight** — route prescription and emergency decisions through a verified doctor role with automatic 60-second backup clinician escalation.
+4. **Traceable Dispensing & Physical Safety** — record the order, payment state, stock lane, dispensing event, refund outcome, and append-only audit event.
+5. **Operational & Edge Resilience** — prove that critical safety rules, stock reservation, and jam recovery function reliably on local edge devices even during transient network outages.
 
 ## What is included
 
@@ -73,21 +76,45 @@ SmartMed demonstrates a controlled last-mile medicine-access model with five goa
 
 ## System architecture
 
+### 1. Main Product Architecture (Internet & Cloud Connected)
+
+```text
+ ┌────────────────────────────────────────────────────────────────────────────────────────┐
+ │                              SMARTMED CLOUD PLATFORM                                   │
+ │  • Scalable Microservices Architecture (REST / WebSockets) • Distributed Cloud DB      │
+ │  • Real-Time Clinical Rules Engine • Telemedicine Gateway • UPI / Card Payment Webhooks│
+ │  • Central Fleet & Inventory Management • Trigger-Protected Append-Only Audit Trail    │
+ └────────────────────────────▲──────────────────────────────▲───────────────────────────┘
+                              │ HTTPS / WSS                  │ MQTT over TLS / Cellular
+                              │                              │
+ ┌────────────────────────────▼──────────────┐ ┌─────────────▼────────────────────────────┐
+ │ MULTI-ROLE MOBILE APP SUITE               │ │ SMARTMED IOT DISPENSING KIOSK            │
+ │ • Patient App: AI triage, calls, payments │ │ • Industrial ESP32-S3 IoT Controller     │
+ │ • Doctor Portal: Queue, Rx & Pass issuance│ │ • 4G/5G Cellular & Wi-Fi Redundancy      │
+ │ • Worker App: Replenishment & diagnostics │ │ • Touch SPI TFT Display & User Camera    │
+ └───────────────────────────────────────────┘ │ • Modular 6+ Spiral Lanes & BO Motors   │
+                                               │ • Dual IR Break-Beam Drop Verification   │
+                                               │ • Thermal & Tamper Monitoring Sensors    │
+                                               └──────────────────────────────────────────┘
+```
+
+### 2. Local Prototype Testbed Architecture (This Repository)
+
 ```text
                          private Wi-Fi / phone hotspot
 
  ┌────────────────┐        REST API         ┌────────────────────────────┐
  │ Android app    │ ◄─────────────────────► │ SmartMed local server       │
  │ Patient        │                          │ Node.js + built-in SQLite  │
- │ Doctor         │                          │ rules engine + audit trail  │
+ │ Doctor         │                          │ rules engine + audit trail │
  │ Worker         │                          └──────────────┬─────────────┘
  └────────────────┘                                         │
                                                            HTTP
                                                             │
                                              ┌──────────────▼─────────────┐
-                                             │ Machine interface           │
-                                             │ 2D simulator / 3D model /   │
-                                             │ future ESP32-class device   │
+                                             │ Machine interface          │
+                                             │ 2D simulator / 3D model /  │
+                                             │ ESP32 test controller      │
                                              └────────────────────────────┘
 ```
 
@@ -199,15 +226,18 @@ Technology must not shift clinical responsibility onto users or create an unsafe
 
 ## Technology stack
 
-| Layer | Implementation |
-|---|---|
-| Mobile app | Kotlin, Jetpack Compose, Android SDK 24+ |
-| QR scanning | ZXing Android Embedded |
-| Backend | Node.js 22.13+ using only built-in modules |
-| Database | Node built-in SQLite (`node:sqlite`) in WAL mode |
-| API | Local REST-style HTTP JSON service on port `8080` |
-| Machine demo | Browser-based 2D machine page and Three.js 3D simulation |
-| Runtime model | Laptop server plus devices on the same Wi-Fi/hotspot |
+### Comparison: Main Commercial Product vs. Prototype Testbed
+
+| Layer / Subsystem | Main Commercial Product (Target) | Prototype Testbed (This Repository) |
+|---|---|---|
+| **Mobile Application** | Kotlin, Jetpack Compose, Material 3 (Android SDK 24+) with video calling, push notifications, and UPI deep-linking. | Kotlin, Jetpack Compose, Material 3 (Android SDK 24+) with multi-role support (Patient, Doctor, Worker). |
+| **QR Code Engine** | ZXing Android Embedded for scanning dynamic single-use session tokens. | ZXing Android Embedded with copy-paste fallback for emulator testing. |
+| **Backend & Cloud** | High-availability cloud microservices (Node.js/Go) on AWS/GCP with automated scaling and load balancers. | Node.js 22.13+ using native modules only (`node:http`, `node:crypto`, `node:fs`, `node:path`) on local port `8080`. |
+| **Database & Persistence** | Distributed PostgreSQL / Supabase with read-replicas, HIPAA/ABDM compliance, and automated backups. | Node built-in SQLite (`node:sqlite`) in WAL mode with trigger-enforced append-only audit tables. |
+| **Machine Telemetry & IoT** | 4G/5G Cellular IoT with **MQTT over TLS** for push commands, telemetry, and heartbeats. | Local REST-style HTTP JSON service (`POST /api/machine`) with machine API keys and 15s heartbeats. |
+| **Hardware Controller** | Industrial ESP32-S3 microcontroller, dual optical IR break-beam drop sensors, and load cells. | Connected browser-based 2D machine interface (`/machine/M1`) and interactive 3D Three.js simulation (`/simulation/M1`). |
+| **Identity & Payments** | Carrier SMS OTP, Aadhaar/ABHA ID, and integrated UPI payment gateways (Razorpay/PayTM). | Local-development OTP (`123456`) and order-bound QR payment confirmation simulation. |
+| **Runtime Model** | Cloud-hosted platform with distributed field kiosks connected via cellular internet. | Laptop/mini-PC local server plus Android devices on the same private Wi-Fi/hotspot. |
 
 ## Getting started
 
