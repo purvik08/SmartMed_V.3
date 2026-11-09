@@ -36,7 +36,7 @@ SmartMed bridges the **last-mile medicine access gap** — pairing an IoT-enable
 
 ---
 
-### 2D Machine Interface — M1 (Railway Station, Surat)
+### 2D Machine Interface — M1
 
 <div align="center">
 
@@ -48,7 +48,7 @@ SmartMed bridges the **last-mile medicine access gap** — pairing an IoT-enable
 
 ---
 
-### 3D Simulation — M2 (Civil Hospital Gate)
+### 3D Simulation — M2
 
 ![Machine M2 — 3D simulation](https://raw.githubusercontent.com/purvik08/SmartMed_V.3/main/docs/screenshots/08_simulation_m2.png)
 
@@ -89,7 +89,7 @@ SmartMed bridges the **last-mile medicine access gap** — pairing an IoT-enable
 > [!WARNING]
 > SmartMed is a **demonstration prototype and testing testbed only** — not a certified medical device, pharmacy system, emergency service, or payment product. It must **not** be used to diagnose, prescribe, dispense, or administer real medicines. Use sealed empty boxes or placebos during demonstrations only.
 >
-> The seeded medicine catalogue, prices, dosage text, age limits, and emergency formulary are **illustrative**. Any commercial deployment requires clinical governance, licensed pharmacy participation, regulatory approval, validated hardware, and local legal compliance.
+> The seeded medicine catalogue, dosage text, age limits, and emergency formulary are **illustrative**. Any commercial deployment requires clinical governance, licensed pharmacy participation, regulatory approval, validated hardware, and local legal compliance.
 
 ---
 
@@ -144,39 +144,39 @@ SmartMed bridges the **last-mile medicine access gap** — pairing an IoT-enable
 ### 🟢 Tier 1 — Over the Counter (OTC)
 *Available directly to any verified patient — no prescription needed.*
 
-| Medicine | Generic | Price | Category | Min Age | Max/Order |
-|:--|:--|--:|:--|:--:|:--:|
-| Paracetamol 500 mg strip | Paracetamol | ₹25 | Fever / Pain | 18 | 2 |
-| ORS sachet | ORS | ₹20 | Hydration | 0 | 4 |
-| Cetirizine 10 mg strip | Cetirizine | ₹35 | Allergy | 18 | 2 |
-| Throat lozenges | — | ₹40 | Cold / Throat | 12 | 2 |
-| Antacid gel sachet | — | ₹30 | Digestive | 12 | 2 |
-| Povidone-iodine solution | — | ₹45 | Antiseptic | 0 | 2 |
+| Medicine | Generic | Category | Min Age | Max/Order |
+|:--|:--|:--|:--:|:--:|
+| Paracetamol 500 mg strip | Paracetamol | Fever / Pain | 18 | 2 |
+| ORS sachet | ORS | Hydration | 0 | 4 |
+| Cetirizine 10 mg strip | Cetirizine | Allergy | 18 | 2 |
+| Throat lozenges | — | Cold / Throat | 12 | 2 |
+| Antacid gel sachet | — | Digestive | 12 | 2 |
+| Povidone-iodine solution | — | Antiseptic | 0 | 2 |
 
 ### 🟡 Tier 2 — Prescription Only (Rx)
 *Requires a valid, unused e-prescription issued by a verified doctor.*
 
-| Medicine | Generic | Price | Category | Min Age |
-|:--|:--|--:|:--|:--:|
-| Amoxicillin 500 mg | Amoxicillin | ₹90 | Antibiotic | 18 |
-| Azithromycin 500 mg | Azithromycin | ₹110 | Antibiotic | 18 |
-| Amlodipine 5 mg | Amlodipine | ₹40 | Blood Pressure | 18 |
-| Metformin 500 mg | Metformin | ₹35 | Diabetes | 18 |
-| Pantoprazole 40 mg | Pantoprazole | ₹60 | Digestive | 18 |
+| Medicine | Generic | Category | Min Age |
+|:--|:--|:--|:--:|
+| Amoxicillin 500 mg | Amoxicillin | Antibiotic | 18 |
+| Azithromycin 500 mg | Azithromycin | Antibiotic | 18 |
+| Amlodipine 5 mg | Amlodipine | Blood Pressure | 18 |
+| Metformin 500 mg | Metformin | Diabetes | 18 |
+| Pantoprazole 40 mg | Pantoprazole | Digestive | 18 |
 
 ### 🔴 Tier 3 — Emergency Only
 *Requires live doctor approval OR a pre-authorised emergency pass.*
 
-| Medicine | Price | Notes |
-|:--|--:|:--|
-| Adrenaline auto-injector (emergency pack) | ₹2,500 | Anaphylaxis |
-| Salbutamol inhaler (emergency pack) | ₹180 | Acute asthma |
-| Aspirin 325 mg chewable (emergency pack) | ₹40 | Cardiac emergency (age ≥18) |
-| Isosorbide dinitrate 5 mg sublingual (emergency pack) | ₹60 | Cardiac emergency (age ≥18) |
-| Oral glucose powder (emergency pack) | ₹30 | Hypoglycaemia |
-| Antihistamine tablet (emergency pack) | ₹35 | Severe allergy (age ≥18) |
-| ORS emergency pack | ₹60 | Severe dehydration |
-| Paracetamol emergency pack | ₹40 | Emergency fever/pain (age ≥18) |
+| Medicine | Notes |
+|:--|:--|
+| Adrenaline auto-injector (emergency pack) | Anaphylaxis |
+| Salbutamol inhaler (emergency pack) | Acute asthma |
+| Aspirin 325 mg chewable (emergency pack) | Cardiac emergency (age ≥18) |
+| Isosorbide dinitrate 5 mg sublingual (emergency pack) | Cardiac emergency (age ≥18) |
+| Oral glucose powder (emergency pack) | Hypoglycaemia |
+| Antihistamine tablet (emergency pack) | Severe allergy (age ≥18) |
+| ORS emergency pack | Severe dehydration |
+| Paracetamol emergency pack | Emergency fever/pain (age ≥18) |
 
 > ⚠️ Tier 3 orders cannot be combined with Tier 1 or Tier 2 items. Tiers are strictly isolated per order.
 
@@ -186,11 +186,11 @@ SmartMed bridges the **last-mile medicine access gap** — pairing an IoT-enable
 
 > 3 demo machines — each with 6 lanes stocked with Tier 1 and Tier 3 medicines.
 
-| Machine | Location | Address | Lanes |
-|:--|:--|:--|:--|
-| **M1** | Railway Station (demo) | Surat Railway Station | Paracetamol · ORS · Cetirizine · Adrenaline · Salbutamol · Aspirin |
-| **M2** | Civil Hospital Gate (demo) | Near hospital main gate | Paracetamol · Antacid · Povidone-iodine · Amoxicillin · Glucose · Isosorbide |
-| **M3** | Highway Plaza NH48 (demo) | Highway rest stop | Paracetamol · ORS · Throat lozenges · Antihistamine · Salbutamol · Cetirizine |
+| Machine | Lanes |
+|:--|:--|
+| **M1** | Paracetamol · ORS · Cetirizine · Adrenaline · Salbutamol · Aspirin |
+| **M2** | Paracetamol · Antacid · Povidone-iodine · Amoxicillin · Glucose · Isosorbide |
+| **M3** | Paracetamol · ORS · Throat lozenges · Antihistamine · Salbutamol · Cetirizine |
 
 > Inventory uses **FEFO** (First Expiry, First Out). All lanes seeded with batch `B-N-DEMO`, expiry `2028-06-30`.
 
