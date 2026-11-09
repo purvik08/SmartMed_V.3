@@ -36,23 +36,15 @@ SmartMed bridges the **last-mile medicine access gap** — pairing an IoT-enable
 
 ---
 
-### 2D Machine Interface — M1
+### 2D Machine Interface
 
 <div align="center">
 
-![Machine M1 — 2D interface with QR code](https://raw.githubusercontent.com/purvik08/SmartMed_V.3/main/docs/screenshots/02_machine_2d.png)
+![2D machine interface with QR code](https://raw.githubusercontent.com/purvik08/SmartMed_V.3/main/docs/screenshots/02_machine_2d.png)
 
 </div>
 
 > The 2D machine view shows the kiosk in **IDLE** state with a live, single-use **machine-identity QR** (`smartmed://m/M1?t=…`) that refreshes every 50 seconds. This is what the physical ESP32 screen would display.
-
----
-
-### 3D Simulation — M2
-
-![Machine M2 — 3D simulation](https://raw.githubusercontent.com/purvik08/SmartMed_V.3/main/docs/screenshots/08_simulation_m2.png)
-
-> Machine M2 is **ONLINE** with its own independent QR session. Each machine maintains separate heartbeats, QR sessions, command queues, and lane inventories.
 
 ---
 
@@ -172,24 +164,9 @@ SmartMed bridges the **last-mile medicine access gap** — pairing an IoT-enable
 
 ## 🤖 Machine Inventory
 
-> 3 demo machines — each with 6 lanes. **●** = stocked in that machine · **·** = not stocked.
+> The prototype runs a **single demo machine** with 6 lanes. A production network manages many machines centrally.
 
-| Medicine        |  M1   |  M2   |  M3   |
-| :-------------- | :---: | :---: | :---: |
-| Paracetamol     |   ●   |   ●   |   ●   |
-| ORS             |   ●   |   ·   |   ●   |
-| Cetirizine      |   ●   |   ·   |   ●   |
-| Adrenaline      |   ●   |   ·   |   ·   |
-| Salbutamol      |   ●   |   ·   |   ●   |
-| Aspirin         |   ●   |   ·   |   ·   |
-| Antacid         |   ·   |   ●   |   ·   |
-| Povidone-iodine |   ·   |   ●   |   ·   |
-| Amoxicillin     |   ·   |   ●   |   ·   |
-| Glucose         |   ·   |   ●   |   ·   |
-| Isosorbide      |   ·   |   ●   |   ·   |
-| Throat lozenges |   ·   |   ·   |   ●   |
-| Antihistamine   |   ·   |   ·   |   ●   |
-| **Lanes used**  | **6** | **6** | **6** |
+The machine's lanes hold: **Paracetamol · ORS · Cetirizine · Adrenaline · Salbutamol · Aspirin**.
 
 > Inventory uses **FEFO** (First Expiry, First Out). All lanes seeded with batch `B-N-DEMO`, expiry `2028-06-30`.
 
@@ -488,9 +465,9 @@ cd server
 node --no-warnings server.mjs
 ```
 
-> **Windows shortcut:** Double-click [`start-medivend.bat`](./start-medivend.bat) — starts the server when port `8080` is free and opens the M1 3D simulation.
+> **Windows shortcut:** Double-click [`start-medivend.bat`](./start-medivend.bat) — starts the server when port `8080` is free and opens the 3D machine simulation.
 
-On first start the server creates `server/data/medivend.db` and seeds users, machines, lanes, and medicines.
+On first start the server creates `server/data/medivend.db` and seeds users, the demo machine, lanes, and medicines.
 
 > 🔥 Allow Node.js through the Windows firewall on **Private** networks when prompted, so a phone on the same Wi-Fi can reach the laptop.
 
@@ -500,14 +477,16 @@ On first start the server creates `server/data/medivend.db` and seeds users, mac
 
 ### Step 2 — 🤖 Open a Machine Interface
 
-Keep **one** interface open per machine. It supplies heartbeats, QR sessions, command polling, and dispense results.
+Keep **one** interface open at a time. It supplies heartbeats, QR sessions, command polling, and dispense results.
 
-| Interface        | M1                              | M2                              | M3                              |
-| :--------------- | :------------------------------ | :------------------------------ | :------------------------------ |
-| 🖥️ 2D screen     | `/machine/M1?key=demo-key-1`    | `/machine/M2?key=demo-key-2`    | `/machine/M3?key=demo-key-3`    |
-| 🎮 3D simulation | `/simulation/M1?key=demo-key-1` | `/simulation/M2?key=demo-key-2` | `/simulation/M3?key=demo-key-3` |
+| Interface        | URL                             |
+| :--------------- | :------------------------------ |
+| 🖥️ 2D screen     | `/machine/M1?key=demo-key-1`    |
+| 🎮 3D simulation | `/simulation/M1?key=demo-key-1` |
 
-> ⚠️ Do **not** open both 2D and 3D views for the same machine simultaneously — both poll the same command queue.
+> The demo machine uses the ID `M1`.
+
+> ⚠️ Do **not** open both 2D and 3D views at the same time — both poll the same command queue.
 
 ---
 
@@ -546,13 +525,13 @@ Any 10-digit number registers with OTP `123456`. Seeded accounts for guided demo
 <details>
 <summary>🛒 <strong>Walkthrough 1 — OTC Purchase (Paracetamol / ORS)</strong></summary>
 
-Ask the Q&A assistant or search for ORS → add to basket → choose machine M1 → request payment QR → scan the separate machine collection QR → observe dispense completion.
+Ask the Q&A assistant or search for ORS → add to basket → choose the machine → request payment QR → scan the separate machine collection QR → observe dispense completion.
 </details>
 
 <details>
-<summary>💊 <strong>Walkthrough 2 — Prescription (Amoxicillin via M2)</strong></summary>
+<summary>💊 <strong>Walkthrough 2 — Prescription Medicine</strong></summary>
 
-Sign in as doctor (`9000000011`) → issue an Amoxicillin prescription to patient `9000000001`. As that patient, select machine M2 → purchase → collect. Prescription is marked one-time-used after successful dispense.
+Sign in as doctor (`9000000011`) → issue a Tier 2 e-prescription to patient `9000000001`. As that patient, select the covered medicine → purchase → collect. Prescription is marked one-time-used after successful dispense.
 </details>
 
 <details>
@@ -570,7 +549,7 @@ Upload a sample document → apply for emergency pass → issue it from the doct
 <details>
 <summary>⚡ <strong>Walkthrough 5 — Jam Recovery</strong></summary>
 
-Activate **Simulate jam** on a machine view before collection. The server restores reserved stock and creates refund + support-ticket records after the failed result.
+Activate **Simulate jam** on the machine view before collection. The server restores reserved stock and creates refund + support-ticket records after the failed result.
 </details>
 
 <details>
@@ -630,9 +609,9 @@ node test/smoke.mjs
 
 - [ ] Server running and machine view is open
 - [ ] App points at correct local server address
-- [ ] Selected machine marked **online**
+- [ ] Machine marked **online**
 - [ ] Patient profile has **date of birth** (needed for age-restricted items)
-- [ ] Only **one** browser machine view active per machine
+- [ ] Only **one** browser machine view (2D or 3D) active at a time
 - [ ] Demo uses **placebos or empty sealed packages** — no real medicines
 
 ---
