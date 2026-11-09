@@ -29,6 +29,8 @@ label.chk{font-size:13px;display:flex;gap:8px;align-items:center;color:var(--ink
 #state{font-family:'Courier New',monospace;font-size:14px;color:var(--gr);font-weight:700}
 #qr{width:190px;height:190px;margin:10px auto;background:#fff;border-radius:8px;padding:8px;display:grid;place-items:center}
 #qr svg{width:100%;height:100%;display:block}
+#paymentQr svg{width:100%;height:100%;display:block}
+.hidden{display:none}
 #deviceScreen{position:absolute;z-index:2;width:146px;min-height:72px;padding:8px;border-radius:4px;background:#0b2942;color:#dff5ff;border:2px solid #071723;font:10px/1.35 ui-monospace,Consolas,monospace;white-space:pre-line;text-align:left;pointer-events:none;transform:translate(-50%,-50%);box-shadow:0 0 16px #4f9bcc}
 #log{font-family:'Courier New',monospace;font-size:12px;color:var(--mu);max-height:140px;overflow:auto;white-space:pre-wrap}
 .legend span{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
@@ -55,6 +57,11 @@ label.chk{font-size:13px;display:flex;gap:8px;align-items:center;color:var(--ink
         <button id="btnReset">Reset view</button>
       </div>
     </div>
+    <div class="card hidden" id="paymentCard">
+      <h3>Payment QR</h3><p id="paymentNote">Scan with the SmartMed app to confirm payment.</p>
+      <div id="paymentQr" style="width:190px;height:190px;margin:10px auto;background:#fff;border-radius:8px;padding:8px"></div>
+    </div>
+    <div class="card"><h3>SmartMed Q&amp;A assistant</h3><p>General guidance only; call 108/112 for emergencies.</p><input id="question" placeholder="Ask a question" style="width:100%;margin:8px 0;padding:8px"><button id="ask" style="width:100%">Ask assistant</button><p id="answer" style="margin-top:8px"></p></div>
     <div class="card">
       <h3>Simulation controls</h3>
       <div class="btns">
@@ -87,7 +94,6 @@ label.chk{font-size:13px;display:flex;gap:8px;align-items:center;color:var(--ink
     </div>
     <div class="card legend">
       <h3>Components</h3>
-      <div><span style="background:#e0b25c"></span>ESP32-AI-Thinker CAM (QR scan)</div>
       <div><span style="background:#1f5c4a"></span>Horizontal spiral coil (black wire)</div><div><span style="background:#1f5c4a"></span>ESP32-S3 (control loops)</div>
       <div><span style="background:#4f7fa3"></span>2.8" SPI touchscreen</div>
       <div><span style="background:#8a8a8a"></span>BO gear motors (no encoder)</div>
@@ -226,11 +232,10 @@ trayLip.position.set(0.9,-3.2,1.57);cab.add(trayLip);
 const eb=group();cab.add(eb);
 const ex=2.45;
 part(eb,1.2,0.8,1.3,0x1f5c4a,ex,1.2,-0.6);
-const cam=part(eb,0.5,0.5,0.4,0xe0b25c,ex,1.2,0.55);
 part(eb,1.2,0.7,1.3,0x2b2b2b,ex,-0.7,-0.6);
 const psu=part(eb,1.2,0.7,1.3,0x2b2b2b,ex,-1.9,-0.6);
 const s3=part(eb,1.2,0.8,1.3,0x1f5c4a,ex,1.2,-0.6);
-// ESP32-S3 sits at ex, 1.2 ; CAM module on the front of the bay at 0.55 offset
+// ESP32-S3 controls the local machine loops.
 
 // Touchscreen on front panel
 const panel=group();cab.add(panel);
@@ -247,7 +252,6 @@ door.visible=false;
 const labelDefs=[
  {t:"2.8\" SPI touchscreen",p:new THREE.Vector3(ex,3.2+1.1,D/2+0.2)},
  {t:"ESP32-S3 control",p:new THREE.Vector3(ex,1.2+0.75,-0.6)},
- {t:"ESP32-AI-Thinker CAM (QR)",p:new THREE.Vector3(ex,1.2+0.6,0.8)},
  {t:"Power supply / servo rail",p:new THREE.Vector3(ex,-1.9+0.6,-0.6)},
  {t:"Spiral coil (own axis)",p:new THREE.Vector3(-1.0,lanes[1].yc+0.9,0.9)},
  {t:"Packets between turns (1 packet = 1 day)",p:new THREE.Vector3(-1.6,lanes[0].yc+0.9,0)},
@@ -284,7 +288,7 @@ function sequence(name,laneIdx,opts){
     ];
   } else if(name==='QR'){
     queue.steps=[
-      ['SCANNING','ESP32-AI-Thinker CAM reads QR token'],
+      ['SCANNING','SmartMed app submits the machine QR token'],
       ['VALIDATING','Local server checks expiry, redemption, and stock'],
       ['DISPENSE_AUTHORIZED','Command sent to ESP32-S3 for '+L.tag],
       ['MOTOR_RUN','BO motor turns coil one turn; one packet advances one pitch'],
@@ -344,6 +348,20 @@ async function refreshQr(){
     setState('OFFLINE');
   }
 }
+async function refreshPayment(){
+  try{
+    const d=await api({action:'payment'}),p=d.payment;
+    document.getElementById('paymentCard').classList.toggle('hidden',!p);
+    if(!p)return;
+    document.getElementById('paymentQr').innerHTML=p.svg;
+    document.getElementById('paymentNote').textContent='Order payment · ₹'+Math.round(p.amount)+' · expires in '+p.expires_in+' s';
+  }catch(e){}
+}
+document.getElementById('ask').onclick=async()=>{
+  const question=document.getElementById('question').value.trim();if(!question)return;
+  const answer=document.getElementById('answer');answer.textContent='Thinking…';
+  try{const r=await fetch('/api/assistant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question})});const d=await r.json();answer.textContent=d.answer||d.error||'No answer available.';}catch(e){answer.textContent='Assistant unavailable.';}
+};
 async function showServerAddress(){
   try{
     const d=await fetch('/api/device-info').then(r=>r.json());
@@ -382,7 +400,9 @@ async function pollServer(){
 setInterval(pollServer,1000);
 setInterval(()=>api({action:'heartbeat'}).catch(()=>{}),15000);
 setInterval(()=>{if(!busy&&Date.now()-lastQr>50000)refreshQr();},2000);
+setInterval(refreshPayment,2000);
 refreshQr();
+refreshPayment();
 showServerAddress();
 
 // Exploded view

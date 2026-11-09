@@ -22,7 +22,7 @@ Its seeded medicine catalogue, prices, dosage text, age limits, allergy tags, an
 - [Applications and social impact](#applications-and-social-impact)
 - [Technology stack](#technology-stack)
 - [Getting started](#getting-started)
-- [Demo accounts and scenarios](#demo-accounts-and-scenarios)
+- [Local accounts and scenarios](#local-accounts-and-scenarios)
 - [Machine integration contract](#machine-integration-contract)
 - [Testing and operational checks](#testing-and-operational-checks)
 - [Repository guide](#repository-guide)
@@ -42,10 +42,10 @@ SmartMed demonstrates a controlled last-mile medicine-access model with five goa
 
 ### Patient Android app
 
-- Offline-local login with a demo OTP.
+- Any 10-digit mobile number can register on the local server after OTP verification and choose a patient, doctor, or worker role.
 - Profile capture for date of birth, allergies, conditions, and current medicines.
-- Medicine search, tier awareness, basket, machine selection, and mock payment.
-- QR-based collection from a selected machine.
+- Three access paths: offline Q&A assistance, direct medicine-name search, or a machine-display-assisted order.
+- Order-bound payment QR confirmation followed by a separate machine-identity QR for collection.
 - Emergency request creation and live status tracking.
 - Emergency-pass application with supporting document upload.
 - Use of an approved emergency pass when declared red-flag symptoms match its conditions.
@@ -103,7 +103,7 @@ The local SQLite database stores users and roles, medicine catalogue entries, ma
 
 ```text
 Patient profile → Browse Tier 1 medicine → Select an online machine
-→ Create order → Mock payment → Scan machine QR → Server validates again
+→ Create order → Scan order-bound payment QR → Scan machine-identity QR
 → Lane command → Sensor/simulator result → Dispensed or refunded
 ```
 
@@ -148,7 +148,7 @@ Paid order → QR redeemed → Stock reserved → Command sent to machine
 → failure or no report within 60 seconds: restore stock, refund, ticket
 ```
 
-The machine page can simulate a jam. A failed or unconfirmed dispense is handled idempotently: the pending command is closed, reserved stock is returned to its lane, the mock captured payment becomes refunded, a refund record is written, and a support ticket is created. This model is designed to make the physical hand-off explicit rather than assuming a paid order was fulfilled.
+The machine page can simulate a jam. A failed or unconfirmed dispense is handled idempotently: the pending command is closed, reserved stock is returned to its lane, the locally confirmed payment becomes refunded, a refund record is written, and a support ticket is created. This model is designed to make the physical hand-off explicit rather than assuming a paid order was fulfilled.
 
 ### 6. Inventory operations
 
@@ -167,7 +167,7 @@ The inventory planner blocks offline machines and selects a lane only when the r
 | Profile safeguards | Age and recorded allergy checks are enforced server-side. |
 | Medicine tiers | Tier 1 = OTC, Tier 2 = prescription, Tier 3 = emergency. Tiers cannot be mixed in one order. |
 | Emergency controls | Live approval or active pass, approval expiry, red-flag match, quantity limits, and a 24-hour limit are checked by the server. |
-| QR collection | A QR contains a machine ID and a single-use token that expires after 60 seconds. |
+| Payment and collection QR codes | An order-bound payment QR expires after five minutes. A distinct machine-identity QR carries only the machine ID and a single-use 60-second collection token. |
 | Machine availability | Machines heartbeat every 15 seconds; a machine is treated as offline after two minutes without a heartbeat. |
 | Inventory | Quantity is reserved atomically before a command; expired lanes are excluded; failed dispenses restore stock. |
 | Traceability | Orders, payments, commands, dispense events, refunds, tickets, and audit events are persisted locally. |
@@ -175,7 +175,7 @@ The inventory planner blocks offline machines and selects a lane only when the r
 
 ### Security boundaries
 
-This implementation is intentionally suitable only for a controlled demonstration network. It uses HTTP cleartext traffic, a fixed demo OTP (`123456`), locally persisted bearer tokens, mock payment capture, and per-machine API keys passed in a request header. These are not production authentication, encryption, key management, payment, or privacy controls.
+This implementation is intentionally suitable only for a controlled local network. It uses HTTP cleartext traffic, a fixed local-development OTP (`123456`), locally persisted bearer tokens, local QR payment confirmation, and per-machine API keys passed in a request header. These are not production authentication, encryption, key management, payment, or privacy controls.
 
 For real use, replace these mechanisms with TLS/mTLS, secure device identity and key rotation, an audited identity provider and OTP service, encrypted storage, least-privilege access controls, session expiry/revocation, secure hardware firmware, payment-provider callbacks, monitoring, backups, incident response, and jurisdiction-specific health-data governance.
 
@@ -251,14 +251,14 @@ M2 uses `key=demo-key-2` and M3 uses `key=demo-key-3`. Do not leave the 2D and 3
 4. At login, configure the server address:
    - Android Emulator: `10.0.2.2:8080`
    - Physical phone: the `LAN-IP:8080` address printed by the server, with the phone and laptop on the same local network.
-5. Sign in using a demo account and OTP `123456`.
+5. Enter any 10-digit mobile number, use local-development OTP `123456`, then choose a role the first time that number registers on the server.
 6. For age-restricted catalogue items, enter date of birth in the patient profile before ordering.
 
-For an emulator, the camera may not be able to scan the QR displayed on the same computer. Copy the QR text shown beneath the browser machine QR into the app's collection screen and select **Start dispensing**.
+For an emulator, the camera may not be able to scan the QR displayed on the same computer. Copy the payment or machine QR text shown beneath the browser display into the corresponding app screen. Payment and collection QR values are intentionally different.
 
-## Demo accounts and scenarios
+## Local accounts and scenarios
 
-All demonstration accounts use OTP `123456`.
+Any 10-digit number can register with local-development OTP `123456` and select a role. The following seeded accounts remain available for guided multi-device demonstrations.
 
 | Role | Phone number | Purpose |
 |---|---:|---|
@@ -270,7 +270,7 @@ All demonstration accounts use OTP `123456`.
 
 Suggested walkthroughs:
 
-1. **OTC:** Search for ORS, add it to the basket, choose an online machine, use mock payment, scan the machine QR, and observe the dispense completion.
+1. **OTC:** Ask the Q&A assistant or search for ORS, add it to the basket, choose an online machine, request the machine payment QR, then scan the distinct machine collection QR and observe the dispense completion.
 2. **Prescription:** Sign in as the doctor and issue an Amoxicillin prescription to a patient. As that patient, select machine M2, purchase the covered item, and collect it. The prescription becomes one-time used after successful dispensing.
 3. **Emergency:** Submit an emergency request from a patient account. On a doctor device, accept and approve it; return to the patient to pay and collect. Use the backup doctor after 60 seconds to demonstrate escalation.
 4. **Pass:** Upload a sample document, apply for an emergency pass, issue it from the doctor account, then use the pass from the patient account with a matching declared red flag.
@@ -345,7 +345,7 @@ Runtime data is generated under `server/data/` and is intentionally excluded fro
 ### Known limitations
 
 - The Android app has been compiled, installed, and tested. Keep the Android SDK, JDK, and Gradle versions aligned with the project configuration when rebuilding it on another machine.
-- The authentication OTP and payment flow are deliberately mocked.
+- OTP delivery and QR payment confirmation are local-development implementations; production requires independently verified identity and payment-provider integrations.
 - Data, uploads, API traffic, and tokens are local-prototype implementations and are not production-secure.
 - The 2D/3D machine pages simulate a dispenser; no ESP32 firmware, certified sensors, or production hardware control is included.
 - No admin dashboard, multilingual UI, video consultation, notification delivery, or real map/routing service is implemented.

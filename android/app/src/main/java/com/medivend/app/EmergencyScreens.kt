@@ -150,6 +150,50 @@ fun EmergencyStatusScreen(id: String) {
 }
 
 @Composable
+fun PaymentScreen(orderId: String) {
+    val act = rememberAct()
+    var manual by remember { mutableStateOf("") }
+
+    fun confirm(qr: String) = act.go {
+        Api.obj("POST", "/api/orders/$orderId/pay-by-qr", jsonOf("qr" to qr))
+        Cart.lines.clear()
+        Nav.replaceTop(Screen.Dispense(orderId))
+    }
+
+    val launcher = rememberLauncherForActivityResult(ScanContract()) { result ->
+        result.contents?.let(::confirm)
+    }
+
+    Page("Pay at the machine") {
+        Load(key = orderId, pollMs = 1500, fetch = { Api.obj("GET", "/api/orders/$orderId") }) { order, _ ->
+            if (order.s("status") == "paid") {
+                Text("Payment confirmed. Continue to the machine collection QR.", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                BigButton("Continue to collect", onClick = { Nav.replaceTop(Screen.Dispense(orderId)) })
+            } else {
+                Heading("Pay ${inr(order.d("total"))}")
+                Gap(8)
+                Text("The selected machine now shows an order-bound payment QR. Scan that payment QR here to confirm the local payment. Do not scan the machine identity QR until payment is complete.", fontSize = 14.sp)
+                Gap(16)
+                BigButton("Scan payment QR", enabled = !act.busy, onClick = {
+                    launcher.launch(ScanOptions().apply {
+                        setPrompt("Scan the payment QR on the machine")
+                        setBeepEnabled(false)
+                        setOrientationLocked(true)
+                        setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                    })
+                })
+                Gap()
+                Text("Camera unavailable? Paste the payment QR text from the machine display:", fontSize = 12.sp)
+                Field("Payment QR text", manual, { manual = it }, hint = "smartmed://pay/order?t=...")
+                OutlinedButton(onClick = { confirm(manual) }, enabled = !act.busy, modifier = Modifier.fillMaxWidth()) { Text("Confirm payment") }
+                Gap(12)
+                Text("Local-development payment confirmation only. A production installation must use a regulated payment provider and verified callback.", fontSize = 12.sp, color = Color.Gray)
+            }
+        }
+    }
+}
+
+@Composable
 fun DispenseScreen(orderId: String) {
     val act = rememberAct()
     var manual by remember { mutableStateOf("") }
@@ -177,14 +221,14 @@ fun DispenseScreen(orderId: String) {
                             ScanOptions().apply {
                                 setPrompt("Scan the QR on the machine")
                                 setBeepEnabled(false)
-                                setOrientationLocked(false)
+                                setOrientationLocked(true)
                                 setDesiredBarcodeFormats(ScanOptions.QR_CODE)
                             },
                         )
                     })
                     Gap()
                     Text("Camera not working (emulator)? Paste the QR text from the machine page:", fontSize = 12.sp)
-                    Field("QR text", manual, { manual = it }, hint = "medivend://m/M1?t=...")
+                    Field("Machine QR text", manual, { manual = it }, hint = "smartmed://m/M1?t=...")
                     OutlinedButton(onClick = { start(manual) }, enabled = !act.busy, modifier = Modifier.fillMaxWidth()) { Text("Start dispensing") }
                 }
                 "dispensing" -> {
@@ -212,4 +256,3 @@ fun DispenseScreen(orderId: String) {
         }
     }
 }
-

@@ -54,13 +54,12 @@ fun HomeTab() {
     val name = App.user?.s("name") ?: ""
     Heading(if (name.isEmpty()) "Hello" else "Hello, $name")
     Gap(8)
-    MachinePicker()
     BigButton("EMERGENCY", color = Color(0xFFC62828), onClick = { Nav.push(Screen.EmergencyForm) })
     Gap(12)
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
-            Text("I know my medicine", fontWeight = FontWeight.Bold)
-            Text("Search and buy OTC or prescription medicine", fontSize = 13.sp, color = Color.Gray)
+            Text("1. I know my medicine", fontWeight = FontWeight.Bold)
+            Text("Enter its brand or generic name, then choose a machine and pay.", fontSize = 13.sp, color = Color.Gray)
             Gap(8)
             OutlinedButton(onClick = { Nav.push(Screen.Search()) }) { Text("Search medicines") }
         }
@@ -68,14 +67,62 @@ fun HomeTab() {
     Gap(8)
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
-            Text("Help me choose", fontWeight = FontWeight.Bold)
-            Text("Answer a few questions for OTC guidance", fontSize = 13.sp, color = Color.Gray)
+            Text("2. Ask the Q&A assistant", fontWeight = FontWeight.Bold)
+            Text("Get general offline guidance before searching the catalogue.", fontSize = 13.sp, color = Color.Gray)
             Gap(8)
-            OutlinedButton(onClick = { Nav.push(Screen.Guide) }) { Text("Start guide") }
+            OutlinedButton(onClick = { Nav.push(Screen.Assistant) }) { Text("Ask a question") }
+        }
+        Gap(8)
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp)) {
+                Text("3. Use a SmartMed machine display", fontWeight = FontWeight.Bold)
+                Text("At the machine, use its Q&A assistant if needed. The machine displays a payment QR and a separate collection QR; scan each only when the app asks.", fontSize = 13.sp, color = Color.Gray)
+                Gap(8)
+                OutlinedButton(onClick = { Nav.push(Screen.Search()) }) { Text("Start an order for a machine") }
+            }
         }
     }
     Gap(12)
     Text("This is guidance, not a medical diagnosis. SmartMed is a prototype and not a medical device.", fontSize = 12.sp, color = Color.Gray)
+}
+
+@Composable
+fun AssistantScreen() {
+    val act = rememberAct()
+    var question by remember { mutableStateOf("") }
+    var answer by remember { mutableStateOf("") }
+    var suggestions by remember { mutableStateOf(emptyList<JSONObject>()) }
+    Page("SmartMed Q&A assistant") {
+        EmergencyBar()
+        Gap(12)
+        Text("Ask about a medicine or a non-emergency symptom. This assistant provides general local catalogue guidance, not a diagnosis or prescription.", fontSize = 13.sp, color = Color.Gray)
+        Gap(8)
+        Field("Your question", question, { question = it }, hint = "For example: What can help with dehydration?", lines = 3)
+        BigButton("Ask assistant", enabled = !act.busy, onClick = {
+            act.go {
+                val r = Api.obj("POST", "/api/assistant", jsonOf("question" to question))
+                answer = r.s("answer")
+                suggestions = r.arr("suggestions").objs()
+            }
+        })
+        if (answer.isNotEmpty()) {
+            Gap(16)
+            Text(answer, color = if (answer.startsWith("This may be an emergency")) Color(0xFFC62828) else Color.Unspecified)
+            suggestions.forEach { med ->
+                Card(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text(med.s("brand"), fontWeight = FontWeight.SemiBold)
+                        Text(med.s("uses"), fontSize = 12.sp, color = Color.Gray)
+                        Text(med.s("warnings"), fontSize = 12.sp, color = Color(0xFFC62828))
+                    }
+                }
+            }
+            if (suggestions.isNotEmpty()) {
+                Gap(8)
+                BigButton("Search suggested medicines", onClick = { Nav.push(Screen.Search(question)) })
+            }
+        }
+    }
 }
 
 @Composable

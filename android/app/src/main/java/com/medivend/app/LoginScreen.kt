@@ -20,6 +20,7 @@ fun LoginScreen() {
     var phone by remember { mutableStateOf("") }
     var otp by remember { mutableStateOf("") }
     var sent by remember { mutableStateOf(false) }
+    var role by remember { mutableStateOf("patient") }
 
     fun applyServer() {
         Api.baseUrl = "http://" + server.trim().removePrefix("http://").trimEnd('/')
@@ -36,7 +37,16 @@ fun LoginScreen() {
             Gap(24)
             Field("Server address (laptop IP:port)", server, { server = it; sent = false }, hint = "192.168.1.5:8080  (emulator: 10.0.2.2:8080)")
             Field("Mobile number (10 digits)", phone, { phone = it.filter { c -> c.isDigit() }.take(10) })
-            if (sent) Field("OTP", otp, { otp = it.filter { c -> c.isDigit() }.take(6) })
+            if (sent) {
+                Field("OTP", otp, { otp = it.filter { c -> c.isDigit() }.take(6) })
+                Text("Choose your role", fontWeight = FontWeight.SemiBold)
+                Column(Modifier.fillMaxWidth()) {
+                    listOf("patient" to "Patient", "doctor" to "Doctor", "worker" to "Worker").forEach { (id, label) ->
+                        RadioRow(label, role == id) { role = id }
+                    }
+                }
+                Text("Your role is recorded when this mobile number first registers on this local server.", fontSize = 12.sp, color = Color.Gray)
+            }
             Gap(8)
             BigButton(if (sent) "Verify and continue" else "Send OTP", enabled = !act.busy, onClick = {
                 applyServer()
@@ -47,7 +57,7 @@ fun LoginScreen() {
                     }
                 } else {
                     act.go {
-                        val r = Api.obj("POST", "/api/auth/verify", jsonOf("phone" to phone, "otp" to otp))
+                        val r = Api.obj("POST", "/api/auth/verify", jsonOf("phone" to phone, "otp" to otp, "role" to role))
                         Api.token = r.getString("token")
                         App.user = r.getJSONObject("user")
                         Prefs.save(ctx)
@@ -56,10 +66,7 @@ fun LoginScreen() {
                 }
             })
             Gap(24)
-            Text(
-                "Demo logins, OTP 123456:\nPatient 9000000001 or 9000000002\nDoctor 9000000011, backup doctor 9000000012\nWorker 9000000021",
-                fontSize = 12.sp, color = Color.Gray,
-            )
+            Text("Use any 10-digit mobile number. The local server uses OTP 123456 for offline development.", fontSize = 12.sp, color = Color.Gray)
             Gap(8)
             Text("Prototype, not a medical device. Works on your local network only.", fontSize = 12.sp, color = Color.Gray)
         }

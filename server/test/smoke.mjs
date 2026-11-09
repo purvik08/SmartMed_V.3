@@ -42,6 +42,11 @@ try {
   const pat = await login('9000000001'), doc = await login('9000000011'), bak = await login('9000000012'), wk = await login('9000000021');
   const pat2 = await login('9000000002');
   ok('login with demo OTP, wrong OTP and missing token are refused');
+  const newDoctor = await api('POST', '/api/auth/verify', { phone: '8111111111', otp: '123456', role: 'doctor' });
+  assert.equal(newDoctor.status, 200); assert.equal(newDoctor.d.user.role, 'doctor');
+  assert.equal((await api('POST', '/api/assistant', { question: 'What helps with dehydration?' })).d.urgent, false);
+  assert.equal((await api('POST', '/api/assistant', { question: 'I have chest pain and trouble breathing' })).d.urgent, true);
+  ok('any mobile number can register a role and use offline Q&A guidance');
   expectErr(await api('GET', '/api/doctor/queue', null, pat), 403);
   ok('roles enforced');
 
@@ -63,11 +68,21 @@ try {
   expectErr(await api('POST', `/api/orders/${oid}/dispense`, { qr: 'hello' }, pat), 400, 'BAD_QR');
   expectErr(await api('POST', `/api/orders/${oid}/dispense`, { qr: await qrFor('M2', 'demo-key-2') }, pat), 409, 'WRONG_MACHINE');
   ok('payment is idempotent; unpaid, junk and wrong-machine QR refused');
+  const qrOrder = (await api('POST', '/api/orders', { machine_id: 'M1', items: [{ medicine_id: 'ors', qty: 1 }] }, pat)).d.order;
+  const paySession = await api('POST', `/api/orders/${qrOrder.id}/payment-session`, {}, pat);
+  assert.equal(paySession.status, 200); assert.match(paySession.d.qr, /^smartmed:\/\/pay\//);
+  const paymentOnMachine = await machine(...M1, { action: 'payment' });
+  assert.equal(paymentOnMachine.d.payment.order_id, qrOrder.id);
+  assert.equal((await api('POST', `/api/orders/${qrOrder.id}/pay-by-qr`, { qr: paymentOnMachine.d.payment.qr }, pat)).d.order.status, 'paid');
+  expectErr(await api('POST', `/api/orders/${qrOrder.id}/dispense`, { qr: paymentOnMachine.d.payment.qr }, pat), 400, 'BAD_QR');
+  await api('POST', `/api/orders/${qrOrder.id}/dispense`, { qr: await qrFor(...M1) }, pat);
+  await runCommand(...M1);
+  ok('payment QR is order-bound and distinct from the machine collection QR');
   const qr = await qrFor(...M1);
   assert.equal((await api('POST', `/api/orders/${oid}/dispense`, { qr }, pat)).d.status, 'dispensing');
   assert.equal((await api('POST', `/api/orders/${oid}/dispense`, { qr }, pat)).d.status, 'dispensing'); // double tap
   const lanesAfter = (await api('GET', '/api/machines/M1/lanes', null, pat)).d.find((l) => l.medicine_id === 'ors');
-  assert.equal(lanesAfter.qty, 8);
+  assert.equal(lanesAfter.qty, 7);
   await runCommand(...M1);
   assert.equal((await api('GET', `/api/orders/${oid}`, null, pat)).d.status, 'dispensed');
   ok('dispense reserves stock, machine report completes the order, double tap is harmless');
@@ -80,7 +95,7 @@ try {
   await api('POST', `/api/orders/${o2.id}/dispense`, { qr: await qrFor(...M1) }, pat);
   await runCommand(...M1, 'fail');
   assert.equal((await api('GET', `/api/orders/${o2.id}`, null, pat)).d.status, 'refunded');
-  assert.equal((await api('GET', '/api/machines/M1/lanes', null, pat)).d.find((l) => l.medicine_id === 'ors').qty, 8);
+  assert.equal((await api('GET', '/api/machines/M1/lanes', null, pat)).d.find((l) => l.medicine_id === 'ors').qty, 7);
   ok('failed dispense is refunded automatically and stock is restored');
 
   console.log('Timeout without machine confirmation');
@@ -182,4 +197,10 @@ try {
   console.log(`\nAll ${passed} checks passed`);
 } catch (e) {
   console.error('\nFAILED:', e.message); console.error(e.stack?.split('\n').slice(1, 4).join('\n')); process.exitCode = 1;
-} finally { srv.kill(); fs.rmSync(dir, { recursive: true, force: true }); }
+} finally {
+  if (srv.exitCode === null) {
+    srv.kill();
+    await new Promise((resolve) => srv.once('exit', resolve));
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
+}

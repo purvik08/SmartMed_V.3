@@ -32,6 +32,20 @@ const machineOut = (m) => ({
   online: m.status === 'active' && !!m.last_seen && Date.now() - new Date(m.last_seen).getTime() < CFG.machineOnlineMs,
 });
 
+const ROLES = new Set(['patient', 'doctor', 'worker']);
+
+function capturePayment(orderId, provider, reference) {
+  const o = get("SELECT * FROM orders WHERE id = ? AND status = 'created'", orderId);
+  if (!o) return get('SELECT * FROM orders WHERE id = ?', orderId);
+  tx(() => {
+    run("INSERT INTO payments VALUES (?,?,'local_qr',?,?,'captured',?)", uid(), o.id, reference, o.total, now());
+    run("UPDATE orders SET status = 'paid', paid_at = ? WHERE id = ? AND status = 'created'", now(), o.id);
+    if (o.ent_type === 'emergency') run("UPDATE emergency_requests SET status = 'PAID' WHERE id = ? AND status = 'APPROVED'", o.ent_id);
+    audit(o.patient_id, 'order.paid', 'order', o.id, { total: o.total, provider });
+  });
+  return get('SELECT * FROM orders WHERE id = ?', orderId);
+}
+
 // ---------- domain operations ----------
 function failOrder(orderId, reason) {
   tx(() => {
@@ -102,7 +116,7 @@ const route = (method, pattern, handler, opts = {}) => {
   routes.push({ method, re, keys, handler, opts });
 };
 
-// ---- auth (offline demo: fixed OTP, no SMS) ----
+// ---- auth (local OTP transport; in production an SMS/identity provider owns delivery) ----
 route('POST', '/api/auth/otp', ({ body }) => {
   need(last10(body.phone).length === 10, 400, 'Enter a 10-digit mobile number');
   console.log(`[otp] demo OTP for ${last10(body.phone)} is ${CFG.otp}`);
@@ -115,8 +129,11 @@ route('POST', '/api/auth/verify', ({ body }) => {
   need(String(body.otp) === CFG.otp, 401, 'Wrong OTP');
   let u = get('SELECT * FROM users WHERE phone = ?', phone);
   if (!u) {
+    const role = String(body.role ?? 'patient').toLowerCase();
+    need(ROLES.has(role), 400, 'Choose patient, doctor, or worker');
     const id = 'u' + uid();
-    run('INSERT INTO users (id, phone, role, created_at) VALUES (?,?,?,?)', id, phone, 'patient', now());
+    run('INSERT INTO users (id, phone, role, role_selected, created_at) VALUES (?,?,?,?,?)', id, phone, role, 1, now());
+    if (role === 'doctor') run('INSERT INTO doctors (user_id, registration_no, verified, online, is_backup) VALUES (?,?,?,?,?)', id, `LOCAL-${phone}`, 1, 1, 0);
     u = get('SELECT * FROM users WHERE id = ?', id);
   }
   const t = token(16);
@@ -150,6 +167,22 @@ route('GET', '/api/machines/:id/lanes', ({ params }) =>
   all(`SELECT l.lane_no, l.medicine_id, l.qty, l.batch, l.expiry, m.brand, m.generic, m.tier
        FROM lanes l LEFT JOIN medicines m ON m.id = l.medicine_id WHERE l.machine_id = ? ORDER BY l.lane_no`, params.id));
 
+// Offline, rule-based Q&A. It deliberately gives general guidance and never diagnoses or authorises a medicine.
+route('POST', '/api/assistant', ({ body }) => {
+  const question = String(body.question ?? '').trim().slice(0, 500);
+  need(question, 400, 'Ask a health or medicine question');
+  const q = question.toLowerCase();
+  const urgent = /chest pain|trouble breathing|difficulty breathing|unconscious|fainting|seizure|stroke|severe bleeding|throat swelling|anaphyl/.test(q);
+  if (urgent) return { urgent: true, answer: 'This may be an emergency. Call 108 or 112 now and seek urgent medical care. SmartMed cannot assess emergencies.', suggestions: [] };
+  const terms = q.split(/[^a-z0-9]+/).filter((x) => x.length >= 3).slice(0, 8);
+  const meds = all('SELECT id, brand, generic, uses, warnings FROM medicines WHERE tier = 1 ORDER BY brand')
+    .filter((m) => terms.some((t) => `${m.brand} ${m.generic} ${m.uses}`.toLowerCase().includes(t))).slice(0, 3);
+  const answer = meds.length
+    ? 'These OTC catalogue items may be relevant to the words you entered. Read their warnings and leaflet, and use the app to check your profile and local stock. This is general information, not a diagnosis or a prescription.'
+    : 'I can provide general catalogue guidance only. For new, severe, persistent, or unclear symptoms, speak with a clinician. Do not use this assistant to delay emergency care.';
+  return { urgent: false, answer, suggestions: meds };
+}, { public: true });
+
 // ---- orders ----
 route('POST', '/api/orders', ({ user, body }) => {
   const { machine_id: machineId, items } = body;
@@ -176,24 +209,52 @@ const entOf = (o) => ({
   red_flags: parse(o.red_flags, []),
 });
 
-// MOCK payment. Real version: payment gateway + verified callback marks the order paid; nothing else changes.
+// Legacy local confirmation endpoint. The app uses the order-bound payment QR endpoints below.
 route('POST', '/api/orders/:id/pay', ({ user, params }) => {
   const o = ownOrder(user, params.id);
   if (o.status !== 'created') return { order: orderOut(o) }; // idempotent
   const items = parse(o.items, []).map((i) => ({ medicine_id: i.medicine_id, qty: i.qty }));
   checkEligibility(user, items, entOf(o), o.id);
   planStock(o.machine_id, items);
+  return { order: orderOut(capturePayment(o.id, 'legacy_local', 'LOCAL-' + token(3).toUpperCase())) };
+}, { role: 'patient' });
+
+// A payment QR is separate from a machine-identity QR. The machine only displays this
+// order-bound local settlement request; it cannot be used to start dispensing.
+route('POST', '/api/orders/:id/payment-session', ({ user, params }) => {
+  const o = ownOrder(user, params.id);
+  need(o.status === 'created', 409, `Order is ${o.status}; payment is not available`);
+  const items = parse(o.items, []).map((i) => ({ medicine_id: i.medicine_id, qty: i.qty }));
+  checkEligibility(user, items, entOf(o), o.id);
+  planStock(o.machine_id, items);
+  const t = token(12);
   tx(() => {
-    run("INSERT INTO payments VALUES (?,?,'mock',?,?,'captured',?)", uid(), o.id, 'MOCK-' + token(3).toUpperCase(), o.total, now());
-    run("UPDATE orders SET status = 'paid', paid_at = ? WHERE id = ? AND status = 'created'", now(), o.id);
-    if (o.ent_type === 'emergency') run("UPDATE emergency_requests SET status = 'PAID' WHERE id = ? AND status = 'APPROVED'", o.ent_id);
-    audit(user.id, 'order.paid', 'order', o.id, { total: o.total });
+    // A physical screen can present one active payment request at a time.
+    run('DELETE FROM payment_sessions WHERE machine_id = ?', o.machine_id);
+    run('INSERT INTO payment_sessions (token, order_id, machine_id, expires_at, created_at) VALUES (?,?,?,?,?)', t, o.id, o.machine_id, ahead(5 * 60_000), now());
   });
-  return { order: orderOut(get('SELECT * FROM orders WHERE id = ?', o.id)) };
+  const qr = `smartmed://pay/${o.id}?t=${t}`;
+  return { order_id: o.id, machine_id: o.machine_id, qr, expires_in: 300 };
+}, { role: 'patient' });
+
+route('POST', '/api/orders/:id/pay-by-qr', ({ user, params, body }) => {
+  const o = ownOrder(user, params.id);
+  const match = /^smartmed:\/\/pay\/([^?]+)\?t=([0-9a-f]{8,64})$/i.exec(String(body.qr ?? '').trim());
+  need(match && match[1] === o.id, 400, 'That is not this order’s payment QR', 'BAD_PAYMENT_QR');
+  if (o.status === 'paid' || o.status === 'dispensing' || o.status === 'dispensed') return { order: orderOut(o) };
+  need(o.status === 'created', 409, `Order is ${o.status}; it cannot be paid`);
+  const s = get('SELECT * FROM payment_sessions WHERE token = ? AND order_id = ?', match[2], o.id);
+  need(s && !s.used_at && new Date(s.expires_at) > new Date(), 410, 'Payment QR expired. Request a new one at the machine.', 'PAYMENT_QR_EXPIRED');
+  const items = parse(o.items, []).map((i) => ({ medicine_id: i.medicine_id, qty: i.qty }));
+  checkEligibility(user, items, entOf(o), o.id);
+  planStock(o.machine_id, items);
+  need(run('UPDATE payment_sessions SET used_at = ? WHERE token = ? AND used_at IS NULL AND expires_at > ?', now(), s.token, now()).changes === 1,
+    409, 'Payment QR was already used or expired', 'PAYMENT_QR_USED');
+  return { order: orderOut(capturePayment(o.id, 'local_qr', 'QR-' + token(4).toUpperCase())) };
 }, { role: 'patient' });
 
 route('POST', '/api/orders/:id/dispense', ({ user, params, body }) => {
-  const m = /^medivend:\/\/m\/([A-Za-z0-9_-]+)\?t=([0-9a-f]{8,64})$/i.exec(String(body.qr ?? '').trim());
+  const m = /^smartmed:\/\/m\/([A-Za-z0-9_-]+)\?t=([0-9a-f]{8,64})$/i.exec(String(body.qr ?? '').trim());
   need(m, 400, 'That is not a SmartMed machine QR', 'BAD_QR');
   const [, qrMachine, tok] = m;
   const o = ownOrder(user, params.id);
@@ -447,8 +508,16 @@ route('POST', '/api/machine', ({ req, body }) => {
     case 'session': { // QR carries only machine id + short-lived single-use token
       const t = token(8);
       run('INSERT INTO qr_sessions (token, machine_id, expires_at) VALUES (?,?,?)', t, m.id, ahead(60_000));
-      const qr = `medivend://m/${m.id}?t=${t}`;
+      const qr = `smartmed://m/${m.id}?t=${t}`;
       return { qr, svg: qrSvg(qr), expires_in: 60 };
+    }
+    case 'payment': {
+      const p = get(`SELECT ps.*, o.total FROM payment_sessions ps JOIN orders o ON o.id = ps.order_id
+        WHERE ps.machine_id = ? AND ps.used_at IS NULL AND ps.expires_at > ? AND o.status = 'created'
+        ORDER BY ps.created_at DESC LIMIT 1`, m.id, now());
+      if (!p) return { payment: null };
+      const qr = `smartmed://pay/${p.order_id}?t=${p.token}`;
+      return { payment: { order_id: p.order_id, amount: p.total, qr, svg: qrSvg(qr), expires_in: Math.max(0, Math.floor((new Date(p.expires_at) - Date.now()) / 1000)) } };
     }
     case 'heartbeat': return { ok: true };
     case 'poll': {
@@ -492,7 +561,7 @@ const server = http.createServer((req, res) => {
 <h2>SmartMed local server is running</h2><p>Enter this in the Android app (Server settings): <b>${ips.map((i) => `${i}:${PORT}`).join(' or ') || 'localhost:' + PORT}</b>
 (emulator: <b>10.0.2.2:${PORT}</b>)</p><p>Machine screens: ${all('SELECT id, api_key FROM machines').map((m) => `<a href="/machine/${m.id}?key=${m.api_key}">${m.id}</a>`).join(' · ')}</p>
 <p>Connected 3D prototype: ${all('SELECT id, api_key FROM machines').map((m) => `<a href="/simulation/${m.id}?key=${m.api_key}">${m.id}</a>`).join(' · ')}</p>
-<p>Demo logins (OTP ${CFG.otp}): patient 9000000001, doctor 9000000011, backup doctor 9000000012, worker 9000000021.</p></body>`, 'text/html');
+<p>Enter any 10-digit number in the app. Local-development OTP: ${CFG.otp}. A role is chosen on first registration.</p></body>`, 'text/html');
   }
   if (req.method === 'GET' && url.pathname.startsWith('/machine/')) return send(200, machineHtml, 'text/html');
   if (req.method === 'GET' && url.pathname.startsWith('/simulation/')) return send(200, simulationHtml, 'text/html');

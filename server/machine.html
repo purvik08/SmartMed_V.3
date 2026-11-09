@@ -5,6 +5,8 @@
 body{font-family:system-ui,sans-serif;background:#0b1f1d;color:#e6fffb;text-align:center;margin:0;padding:20px}
 .card{background:#12332f;border-radius:16px;padding:18px;max-width:460px;margin:0 auto 14px}
 #qr svg{width:260px;height:260px;border-radius:12px}
+#paymentQr svg{width:220px;height:220px;border-radius:12px}
+.hidden{display:none}
 .s{font-size:22px;font-weight:700;color:#5eead4}
 code{word-break:break-all;font-size:12px;color:#9be}
 button{padding:10px 16px;border-radius:10px;border:0;font-size:15px}
@@ -12,6 +14,8 @@ pre{text-align:left;font-size:12px;white-space:pre-wrap;color:#9bd}
 </style></head><body>
 <div class="card"><h2 id="title">SmartMed machine</h2><div id="state" class="s">BOOTING</div><div id="note"></div></div>
 <div class="card"><div id="qr"></div><p>Scan with the SmartMed app<br><small>QR is single-use and refreshes about every 50 s</small></p><code id="code"></code></div>
+<div class="card hidden" id="paymentCard"><h3>Payment QR</h3><div id="paymentQr"></div><p id="paymentNote">Scan this with the SmartMed app to confirm the local payment.</p><code id="paymentCode"></code></div>
+<div class="card"><h3>SmartMed Q&amp;A assistant</h3><p>Ask a general medicine or symptom question. For emergencies, call 108/112.</p><input id="question" aria-label="Health question" placeholder="Type your question" style="width:100%;padding:10px;margin:10px 0;border-radius:8px;border:1px solid #5eead4"><button id="ask">Ask assistant</button><pre id="answer"></pre></div>
 <div class="card"><button id="jam">Simulate jam on next dispense: OFF</button><pre id="log"></pre></div>
 <script>
 // This page plays the role of the ESP32 firmware: it only talks to /api/machine, exactly like the real hardware will.
@@ -37,6 +41,17 @@ async function refreshQr() {
     if (!busy) setState('IDLE');
   } catch (e) { setState('OFFLINE', e.message); }
 }
+async function refreshPayment() {
+  try {
+    const d = await call({ action: 'payment' });
+    const p = d.payment;
+    $('paymentCard').classList.toggle('hidden', !p);
+    if (!p) return;
+    $('paymentQr').innerHTML = p.svg;
+    $('paymentCode').textContent = p.qr;
+    $('paymentNote').textContent = `Order payment · ₹${Math.round(p.amount)} · expires in ${p.expires_in} s`;
+  } catch (_) { /* heartbeat/status display handles machine errors */ }
+}
 async function dispense(cmd) {
   busy = true;
   setState('VALIDATING'); log('Order ' + cmd.order_id + ' received'); await sleep(600);
@@ -57,8 +72,20 @@ async function dispense(cmd) {
   await sleep(2500); busy = false; await refreshQr(); // QR tokens are single-use
 }
 $('jam').onclick = () => { jamNext = !jamNext; $('jam').textContent = 'Simulate jam on next dispense: ' + (jamNext ? 'ON' : 'OFF'); };
+$('ask').onclick = async () => {
+  const question = $('question').value.trim();
+  if (!question) return;
+  $('answer').textContent = 'Thinking…';
+  try {
+    const r = await fetch('/api/assistant', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question }) });
+    const d = await r.json();
+    $('answer').textContent = d.answer || d.error || 'No answer available.';
+  } catch (e) { $('answer').textContent = 'Assistant is unavailable: ' + e.message; }
+};
 setInterval(async () => { if (busy) return; try { const d = await call({ action: 'poll' }); if (d.command) await dispense(d.command); } catch (e) { setState('OFFLINE', e.message); } }, 1000);
 setInterval(() => call({ action: 'heartbeat' }).catch(() => {}), 15000);
 setInterval(() => { if (!busy && Date.now() - lastQr > 50000) refreshQr(); }, 2000);
+setInterval(refreshPayment, 2000);
 refreshQr();
+refreshPayment();
 </script></body></html>

@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS orders (
   id TEXT PRIMARY KEY, patient_id TEXT NOT NULL, machine_id TEXT NOT NULL, items TEXT NOT NULL, total REAL NOT NULL,
   status TEXT NOT NULL, ent_type TEXT NOT NULL, ent_id TEXT, red_flags TEXT, created_at TEXT, paid_at TEXT);
 CREATE TABLE IF NOT EXISTS payments (id TEXT PRIMARY KEY, order_id TEXT UNIQUE NOT NULL, provider TEXT, ref TEXT, amount REAL, status TEXT, created_at TEXT);
+CREATE TABLE IF NOT EXISTS payment_sessions (token TEXT PRIMARY KEY, order_id TEXT UNIQUE NOT NULL, machine_id TEXT NOT NULL, expires_at TEXT NOT NULL, used_at TEXT, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS dispense_events (id TEXT PRIMARY KEY, order_id TEXT, machine_id TEXT, lanes TEXT, result TEXT NOT NULL DEFAULT 'pending', reason TEXT, started_at TEXT, finished_at TEXT);
 CREATE TABLE IF NOT EXISTS commands (id TEXT PRIMARY KEY, machine_id TEXT, order_id TEXT, items TEXT, status TEXT NOT NULL DEFAULT 'pending', created_at TEXT);
 CREATE TABLE IF NOT EXISTS refunds (id TEXT PRIMARY KEY, order_id TEXT, payment_id TEXT, amount REAL, reason TEXT, status TEXT, created_at TEXT);
@@ -90,6 +91,9 @@ CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, act
 CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit_logs BEGIN SELECT RAISE(ABORT, 'audit_logs is append-only'); END;
 CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit_logs BEGIN SELECT RAISE(ABORT, 'audit_logs is append-only'); END;
 `);
+
+// Backward-compatible migration for databases created before role selection was added.
+try { db.exec('ALTER TABLE users ADD COLUMN role_selected INTEGER NOT NULL DEFAULT 1'); } catch { /* column already exists */ }
 
 // ---------------- seed (first run only) ----------------
 if (!get('SELECT 1 AS x FROM medicines LIMIT 1')) {

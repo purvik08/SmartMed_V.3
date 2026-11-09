@@ -53,12 +53,14 @@ sealed class Screen {
     data object DoctorHome : Screen()
     data object WorkerHome : Screen()
     data class Search(val query: String = "") : Screen()
+    data object Assistant : Screen()
     data object CartScreen : Screen()
     data object Guide : Screen()
     data object Profile : Screen()
     data object EmergencyForm : Screen()
     data class EmergencyStatus(val id: String) : Screen()
     data class Dispense(val orderId: String) : Screen()
+    data class Payment(val orderId: String) : Screen()
     data object ApplyPass : Screen()
     class UsePass(val pass: JSONObject) : Screen()
     data class DoctorCase(val id: String) : Screen()
@@ -290,7 +292,7 @@ fun MachinePicker() {
     Gap(8)
 }
 
-// ---------------- create order, mock payment, then go and collect ----------------
+// ---------------- create order, request a machine payment QR, then collect ----------------
 class Checkout(val act: Act) {
     var pending by mutableStateOf<JSONObject?>(null)
     fun start(body: JSONObject) = act.go {
@@ -309,17 +311,16 @@ fun CheckoutDialog(co: Checkout) {
     val o = co.pending ?: return
     AlertDialog(
         onDismissRequest = { co.pending = null },
-        title = { Text("Mock UPI payment") },
-        text = { Text("Pay ${inr(o.d("total"))} to SmartMed?\n\nPrototype: no real money moves.") },
+        title = { Text("Continue to machine payment") },
+        text = { Text("Order ${shortId(o.s("id"))} is ready for ${inr(o.d("total"))}. The selected machine will display a payment QR. This is different from the machine QR used later for collection.") },
         confirmButton = {
             Button(onClick = {
                 co.pending = null
                 co.act.go {
-                    Api.obj("POST", "/api/orders/${o.s("id")}/pay")
-                    Cart.lines.clear()
-                    Nav.push(Screen.Dispense(o.s("id")))
+                    Api.obj("POST", "/api/orders/${o.s("id")}/payment-session")
+                    Nav.push(Screen.Payment(o.s("id")))
                 }
-            }) { Text("Pay") }
+            }) { Text("Show payment QR") }
         },
         dismissButton = { TextButton(onClick = { co.pending = null }) { Text("Cancel") } },
     )
