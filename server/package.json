@@ -1,0 +1,11 @@
+{
+  "name": "medivend-local-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --no-warnings server.mjs",
+    "test": "node test/smoke.mjs"
+  }
+}

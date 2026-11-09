@@ -1,0 +1,20 @@
+# MediVend runtime data and private uploads
+server/data/
+
+# Android / Gradle local and generated files
+.gradle/
+**/.gradle/
+**/build/
+android/local.properties
+android/Key
+android/app/release/
+*.apk
+*.aab
+
+# Editor and operating-system files
+.idea/
+*.iml
+.vscode/
+*.log
+Thumbs.db
+.DS_Store

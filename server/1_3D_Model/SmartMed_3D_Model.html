@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SmartMed Dispatch – 3D Machine Model</title>
+<style>
+:root{--bg:#f5f2ea;--ink:#1c2722;--mu:#5e6a63;--gr:#1f5c4a;--go:#e0b25c;--pn:#fbfaf6;--ln:#cdc6b3;--rd:#b3392f}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12312a;--ink:#f3efe4;--mu:#b9c4bc;--gr:#7fc4a8;--go:#e0b25c;--pn:#1a3d34;--ln:#2e5a4d;--rd:#e87f72}}
+:root[data-theme="dark"]{--bg:#12312a;--ink:#f3efe4;--mu:#b9c4bc;--gr:#7fc4a8;--go:#e0b25c;--pn:#1a3d34;--ln:#2e5a4d;--rd:#e87f72}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
+body{display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+header{padding:14px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--ln)}
+header h1{font-family:Georgia,serif;font-weight:400;font-size:24px;margin:0}
+header p{margin:0;font-size:13px;color:var(--mu)}
+.wrap{flex:1;display:flex;min-height:0;flex-wrap:wrap}
+#view{flex:1 1 560px;min-height:0;height:calc(100vh - 70px);position:relative}
+#view canvas{display:block;width:100%;height:100%}
+aside{flex:0 0 320px;padding:18px;height:calc(100vh - 70px);overflow:auto;border-left:1px solid var(--ln);display:flex;flex-direction:column;gap:14px}
+.card{background:var(--pn);border:1px solid var(--ln);border-radius:10px;padding:14px}
+.card h3{margin:0 0 6px;font-size:15px;color:var(--gr)}
+.card p{margin:0;font-size:13px;line-height:1.45;color:var(--ink)}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+button{font:inherit;font-size:13px;padding:9px 10px;border-radius:8px;border:1px solid var(--gr);background:transparent;color:var(--ink);cursor:pointer}
+button:hover{background:var(--gr);color:var(--bg)}
+button.primary{background:var(--gr);color:var(--bg)}
+label.chk{font-size:13px;display:flex;gap:8px;align-items:center;color:var(--ink)}
+#state{font-family:'Courier New',monospace;font-size:14px;color:var(--gr);font-weight:700}
+#qr{width:190px;height:190px;margin:10px auto;background:#fff;border-radius:8px;padding:8px;display:grid;place-items:center}
+#qr svg{width:100%;height:100%;display:block}
+#deviceScreen{position:absolute;z-index:2;width:146px;min-height:72px;padding:8px;border-radius:4px;background:#0b2942;color:#dff5ff;border:2px solid #071723;font:10px/1.35 ui-monospace,Consolas,monospace;white-space:pre-line;text-align:left;pointer-events:none;transform:translate(-50%,-50%);box-shadow:0 0 16px #4f9bcc}
+#log{font-family:'Courier New',monospace;font-size:12px;color:var(--mu);max-height:140px;overflow:auto;white-space:pre-wrap}
+.legend span{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.legend div{font-size:12px;color:var(--mu);margin:4px 0}
+@media (max-width:760px){aside{flex:1 1 100%;height:auto;border-left:none;border-top:1px solid var(--ln)}#view{height:70vh;min-height:360px}}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>SmartMed Dispatch — 3D Machine Model</h1><p>Layout, component placement, and dispensing mechanism. Drag to orbit, scroll to zoom.</p></div>
+  <div id="state">IDLE</div>
+</header>
+<div class="wrap">
+  <div id="view"></div>
+  <aside>
+    <div class="card">
+      <h3>Connected machine</h3>
+      <p id="connection">Connecting to local MediVend server…</p>
+      <p style="margin-top:8px">Scan or paste this one-time QR in the Android app:</p>
+      <div id="qr" aria-label="Machine QR code"></div>
+      <code id="code" style="display:block;word-break:break-all;font-size:11px;color:var(--gr)"></code>
+      <div class="btns" style="margin-top:10px">
+        <button class="primary" id="btnQr">Refresh QR</button>
+        <button id="btnReset">Reset view</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Simulation controls</h3>
+      <div class="btns">
+        <button id="btnOtc">Demo motion</button>
+        <button id="btnJam">Simulate jam: OFF</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>View</h3>
+      <div class="btns">
+        <button id="btnExploded">Exploded view</button>
+        <button id="btnDoor">Open service door</button>
+      </div>
+      <label class="chk" style="margin-top:10px"><input type="checkbox" id="chkLabels" checked> Show labels</label>
+      <label class="chk"><input type="checkbox" id="chkAuto"> Auto-rotate</label>
+      <label class="chk"><input type="checkbox" id="chkPath" checked> Show dispense path</label>
+    </div>
+    <div class="card">
+      <h3>Camera</h3>
+      <div class="btns">
+        <button id="btnZoomIn">Zoom in +</button>
+        <button id="btnZoomOut">Zoom out −</button>
+        <button id="btnUp">Pan up ▲</button>
+        <button id="btnDown">Pan down ▼</button>
+        <button id="btnLeft">Pan left ◀</button>
+        <button id="btnRight">Pan right ▶</button>
+      </div>
+      <button style="width:100%;margin-top:8px" id="btnFit">Fit whole machine</button>
+      <p style="margin-top:8px">Tip: hold a button to keep moving. You can also drag the view and use the scroll wheel.</p>
+    </div>
+    <div class="card legend">
+      <h3>Components</h3>
+      <div><span style="background:#e0b25c"></span>ESP32-AI-Thinker CAM (QR scan)</div>
+      <div><span style="background:#1f5c4a"></span>Horizontal spiral coil (black wire)</div><div><span style="background:#1f5c4a"></span>ESP32-S3 (control loops)</div>
+      <div><span style="background:#4f7fa3"></span>2.8" SPI touchscreen</div>
+      <div><span style="background:#8a8a8a"></span>BO gear motors (no encoder)</div>
+      <div><span style="background:#c85a4a"></span>Limit switches (home)</div>
+      <div><span style="background:#7b5ea7"></span>IR sensors (exit confirm)</div>
+      <div><span style="background:#d9d2bd"></span>Medicine packets (1 packet = 1 day)</div>
+      <div><span style="background:#2b2b2b"></span>Power supply and servo rails</div>
+    </div>
+    <div class="card">
+      <h3>Event log</h3>
+      <div id="log">Ready.</div>
+    </div>
+  </aside>
+</div>
+
+<script src="/assets/three.min.js"></script>
+<script>
+(function(){
+const machineId=location.pathname.split('/').pop();
+const machineKey=new URLSearchParams(location.search).get('key')||'';
+let jamNext=false,busy=false,lastQr=0;
+async function api(body){
+  const r=await fetch('/api/machine',{method:'POST',headers:{'Content-Type':'application/json','x-machine-key':machineKey},body:JSON.stringify({machine_id:machineId,...body})});
+  const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||('HTTP '+r.status));return d;
+}
+const host=document.getElementById('view');
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+host.appendChild(renderer.domElement);
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()||'#f5f2ea');
+const camera=new THREE.PerspectiveCamera(40,1,0.1,100);
+camera.position.set(9,7,11);
+const target=new THREE.Vector3(0,-0.7,0);
+
+scene.add(new THREE.HemisphereLight(0xffffff,0x665544,0.9));
+const key=new THREE.DirectionalLight(0xffffff,0.9);key.position.set(6,10,6);scene.add(key);
+
+function mat(c,o){return new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:0.6,metalness:0.05},o||{}));}
+function box(w,h,d,c,x,y,z,o){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(c,o));m.position.set(x,y,z);scene.add(m);return m;}
+function group(){const g=new THREE.Group();scene.add(g);return g;}
+
+// Cabinet
+const cab=group();
+const W=6,H=7.6,D=3.6;
+const shell=mat(0xe9e4d6,{roughness:0.8});
+function part(parent,w,h,d,c,x,y,z,o){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(c,o));m.position.set(x,y,z);parent.add(m);return m;}
+// Walls (open on front so internals are visible; front door is a separate group)
+part(cab,W,0.15,D,0xdcd5c2,0,-H/2,0);            // base
+part(cab,W,0.15,D,0xdcd5c2,0,H/2,0);             // top
+part(cab,0.15,H,D,0xdcd5c2,-W/2,0,0);            // left
+part(cab,0.15,H,D,0xdcd5c2,W/2,0,0);             // right
+part(cab,W,H,0.15,0xdcd5c2,0,0,-D/2);            // back
+
+// Zones: medicine storage (left 2/3 of cabinet), electronics bay (right 1/3), touch panel (front top)
+const storageX=-0.9;
+// Divider wall between storage and electronics (isolation)
+const divider=part(cab,0.12,H-0.3,D-0.3,0x9aa39a,1.2,0,0,{transparent:true,opacity:0.85});
+divider.userData.label="Isolation wall: electronics physically separated from medicine";
+
+// Dispensing lanes: horizontal troughs stacked in rows.
+// Each trough holds a horizontal spiral coil on its own axis. One full revolution advances packets by one pitch.
+const lanes=[];
+const pathLines=[];
+// Six lanes match the lane numbers exposed by the local server and Android app.
+const LANE_Y=[2.55,1.5,0.45,-0.6,-1.65,-2.7];
+const XB=-2.6;              // coil start (drive end)
+const PITCH=0.65;           // one packet length between coil turns
+const TURNS=5;              // 5 turns x 0.65 = 3.25 length
+const XT=XB+TURNS*PITCH;    // coil end
+const RAD=0.22;             // coil radius
+const XEND=XT+0.1;          // exit edge
+for(let i=0;i<LANE_Y.length;i++){
+  const yc=LANE_Y[i];
+  const lg=group();cab.add(lg);
+  // trough floor and side walls
+  const floor=new THREE.Mesh(new THREE.BoxGeometry(3.7,0.05,1.9),mat(0xe6e6e0,{roughness:0.6}));
+  floor.position.set(-1.0,yc-0.35,0);lg.add(floor);
+  for(const dz of [-0.95,0.95]){
+    const wall=new THREE.Mesh(new THREE.BoxGeometry(3.7,0.6,0.05),mat(0xf2f2ee,{roughness:0.5}));
+    wall.position.set(-1.0,yc,dz);lg.add(wall);
+  }
+  // spiral coil: built around its own axis at (x, yc, 0), axis along X
+  const coil=new THREE.Group();coil.position.set(0,yc,0);lg.add(coil);
+  const pts=[];
+  for(let k=0;k<=TURNS*24;k++){
+    const t=k/(TURNS*24);const a=t*Math.PI*2*TURNS;
+    pts.push(new THREE.Vector3(XB+t*(XT-XB), Math.cos(a)*RAD, Math.sin(a)*RAD));
+  }
+  // the coil's rotating group is a child of coil so it spins about the coil axis
+  const spin=new THREE.Group();coil.add(spin);
+  spin.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),400,0.03,8,false),mat(0x1a1a1a,{roughness:0.4})));
+  // drive shaft (from head to coil start) and motor on the drive head
+  const shaft=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.35,12),mat(0xcccccc));
+  shaft.rotation.z=Math.PI/2;shaft.position.set(-2.78,yc,0);lg.add(shaft);
+  const head=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.7,0.7),mat(0x222222,{roughness:0.5}));
+  head.position.set(-2.95,yc,0);lg.add(head);
+  const motor=new THREE.Mesh(new THREE.CylinderGeometry(0.18,0.18,0.6,20),mat(0x8a8a8a,{metalness:0.4,roughness:0.35}));
+  motor.rotation.z=Math.PI/2;motor.position.set(-3.3,yc,0);lg.add(motor);
+  // limit switch on the drive head (trips once per full turn)
+  const lim=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.14,0.14),mat(0xc85a4a));
+  lim.position.set(-2.95,yc+0.5,0.4);lg.add(lim);
+  // packets sit in the gaps between turns: one per pitch, moved together with the spin
+  const pk=new THREE.Group();lg.add(pk);
+  const packets=[];
+  for(let p=0;p<5;p++){
+    const m=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.3,1.2),mat(0xd9d2bd,{roughness:0.9}));
+    m.position.set(XB+PITCH*0.5+p*PITCH,yc+0.3,0);pk.add(m);packets.push(m);
+  }
+  // sloped ramp from the lane exit down to the shared drop column
+  const ramp=new THREE.Mesh(new THREE.BoxGeometry(0.6,0.05,1.2),mat(0xaaa38c));
+  ramp.position.set(0.875,yc-0.35,0);ramp.rotation.z=-1.1;lg.add(ramp);
+  // IR sensor beside the drop column, one per lane
+  const ir=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.16,0.16),mat(0x7b5ea7));
+  ir.position.set(1.12,yc-0.9,0.5);lg.add(ir);
+  const irBeam=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.8,8),mat(0x7b5ea7,{transparent:true,opacity:0}));
+  irBeam.position.set(1.12,yc-0.9,0.5);lg.add(irBeam);
+  // the dropping packet travels the path to the pickup tray (hidden until dispense)
+  const moving=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.3,1.2),mat(0xd9d2bd,{roughness:0.9}));
+  moving.position.set(XEND,yc+0.3,0);moving.visible=false;scene.add(moving);
+  const path=[new THREE.Vector3(XEND,yc+0.3,0),new THREE.Vector3(1.0,yc-0.6,0),new THREE.Vector3(1.0,-2.95,0),new THREE.Vector3(0.9,-3.08,1.0)];
+  const pl=new THREE.Line(new THREE.BufferGeometry().setFromPoints(path),new THREE.LineDashedMaterial({color:0x1f5c4a,dashSize:0.12,gapSize:0.08}));
+  pl.computeLineDistances();scene.add(pl);pathLines.push(pl);
+  lanes.push({i,yc,pk,packets,spin,head,motor,lim,ramp,ir,irBeam,moving,path,state:'idle',rot:0,dropT:0,tag:`Lane ${String.fromCharCode(65+i)}`});
+}
+
+// Shared drop column and pickup tray: every lane feeds into this path
+const col=new THREE.Mesh(new THREE.BoxGeometry(0.2,5.65,0.9),mat(0xcfd8d2,{transparent:true,opacity:0.3}));
+col.position.set(1.0,-0.125,0);cab.add(col);
+const tray=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.12,1.2),mat(0x9aa39a));
+tray.position.set(0.9,-3.3,1.0);cab.add(tray);
+const trayLip=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.3,0.06),mat(0x9aa39a));
+trayLip.position.set(0.9,-3.2,1.57);cab.add(trayLip);
+
+// Electronics bay (right side)
+const eb=group();cab.add(eb);
+const ex=2.45;
+part(eb,1.2,0.8,1.3,0x1f5c4a,ex,1.2,-0.6);
+const cam=part(eb,0.5,0.5,0.4,0xe0b25c,ex,1.2,0.55);
+part(eb,1.2,0.7,1.3,0x2b2b2b,ex,-0.7,-0.6);
+const psu=part(eb,1.2,0.7,1.3,0x2b2b2b,ex,-1.9,-0.6);
+const s3=part(eb,1.2,0.8,1.3,0x1f5c4a,ex,1.2,-0.6);
+// ESP32-S3 sits at ex, 1.2 ; CAM module on the front of the bay at 0.55 offset
+
+// Touchscreen on front panel
+const panel=group();cab.add(panel);
+const tsBezel=part(panel,2.4,1.8,0.08,0x2b2b2b,ex,3.2,D/2+0.05);
+const tsScreen=part(panel,2.1,1.5,0.1,0x4f7fa3,ex,3.2,D/2+0.1,{emissive:0x0a1a2a});
+
+// Front door
+const doorPivot=new THREE.Group();doorPivot.position.set(-W/2,0,D/2);cab.add(doorPivot);
+const door=new THREE.Mesh(new THREE.BoxGeometry(W-0.3,H-0.3,0.12),mat(0xfbfaf6,{transparent:true,opacity:0.35}));
+door.position.set(W/2-0.15,0,0);doorPivot.add(door);
+door.visible=false;
+
+// Labels (DOM overlay projected)
+const labelDefs=[
+ {t:"2.8\" SPI touchscreen",p:new THREE.Vector3(ex,3.2+1.1,D/2+0.2)},
+ {t:"ESP32-S3 control",p:new THREE.Vector3(ex,1.2+0.75,-0.6)},
+ {t:"ESP32-AI-Thinker CAM (QR)",p:new THREE.Vector3(ex,1.2+0.6,0.8)},
+ {t:"Power supply / servo rail",p:new THREE.Vector3(ex,-1.9+0.6,-0.6)},
+ {t:"Spiral coil (own axis)",p:new THREE.Vector3(-1.0,lanes[1].yc+0.9,0.9)},
+ {t:"Packets between turns (1 packet = 1 day)",p:new THREE.Vector3(-1.6,lanes[0].yc+0.9,0)},
+ {t:"BO gear motor + drive head",p:new THREE.Vector3(-3.3,lanes[2].yc+0.9,0)},
+ {t:"Limit switch (once per turn)",p:new THREE.Vector3(-2.95,lanes[3].yc+0.9,0.4)},
+ {t:"Lane exit ramp",p:new THREE.Vector3(0.9,lanes[1].yc-0.9,0.6)},
+ {t:"Drop column (medicine path)",p:new THREE.Vector3(1.0,-1.2,-0.9)},
+ {t:"IR sensor (per lane)",p:new THREE.Vector3(1.12,lanes[2].yc-1.25,0.5)},
+ {t:"Pickup tray (user collects here)",p:new THREE.Vector3(0.9,-3.3,1.75)},
+ {t:"Isolation wall",p:new THREE.Vector3(1.2,H/2-0.4,D/2)},
+];
+const labels=labelDefs.map(d=>{const el=document.createElement('div');el.textContent=d.t;el.style.cssText="position:absolute;font:12px Arial;color:var(--ink);background:var(--pn);border:1px solid var(--ln);padding:3px 7px;border-radius:6px;pointer-events:none;white-space:nowrap;transform:translate(-50%,-50%)";host.appendChild(el);return {el,p:d.p};});
+const deviceScreen=document.createElement('div');
+deviceScreen.id='deviceScreen';deviceScreen.textContent='MEDIVEND\nFinding local IP…';host.appendChild(deviceScreen);
+const deviceScreenPoint=new THREE.Vector3(ex,3.2,D/2+0.24);
+
+// Animation / sequence logic
+const stateEl=document.getElementById('state');const logEl=document.getElementById('log');
+function log(m){logEl.textContent=(logEl.textContent==='Ready.'?'':logEl.textContent+'\n')+m;logEl.scrollTop=logEl.scrollHeight;}
+function setState(s){stateEl.textContent=s;}
+let queue=null;
+function sequence(name,laneIdx,opts){
+  opts=opts||{};
+  const L=lanes[laneIdx];
+  queue={name,lane:L,steps:[]};
+  if(name==='OTC'){
+    queue.steps=[
+      ['VALIDATING','OTC request screened by the local MediVend safety engine'],
+      ['DISPENSE_AUTHORIZED','Command sent to ESP32-S3 for '+L.tag],
+      ['MOTOR_RUN','BO motor turns coil one turn; one packet advances one pitch'],
+      ['LIMIT_HIT','Limit switch tripped at home position; motor stops'],
+      ['WAITING_FOR_SENSOR','Packet on chute, awaiting IR confirmation'],
+      ['DISPENSE_CONFIRMED','IR sensor saw packet; transaction recorded']
+    ];
+  } else if(name==='QR'){
+    queue.steps=[
+      ['SCANNING','ESP32-AI-Thinker CAM reads QR token'],
+      ['VALIDATING','Local server checks expiry, redemption, and stock'],
+      ['DISPENSE_AUTHORIZED','Command sent to ESP32-S3 for '+L.tag],
+      ['MOTOR_RUN','BO motor turns coil one turn; one packet advances one pitch'],
+      ['LIMIT_HIT','Limit switch tripped at home position; motor stops'],
+      ['WAITING_FOR_SENSOR','Packet on chute, awaiting IR confirmation'],
+      ['DISPENSE_CONFIRMED','IR confirmed; packet in pickup tray; token marked REDEEMED']
+    ];
+  } else if(name==='JAM'){
+    queue.steps=[
+      ['VALIDATING','QR token valid'],
+      ['DISPENSE_AUTHORIZED','Command sent for '+L.tag],
+      ['MOTOR_RUN','BO motor running'],
+      ['JAM','Limit switch never trips within timeout; motor stopped'],
+      ['DISPENSE_FAILED','Jam logged; token NOT redeemed; manual reconciliation']
+    ];
+  }
+  queue.i=0;queue.t=0;
+  return new Promise(resolve=>{queue.resolve=resolve;playStep();});
+}
+function playStep(){
+  if(!queue)return;
+  const st=queue.steps[queue.i];
+  if(!st){const done=queue.resolve;queue=null;if(done)done();return;}
+  setState(st[0]);log(st[0]+' — '+st[1]);
+  const L=queue.lane;
+  if(st[0]==='MOTOR_RUN'){L.state='run';L.rot=0;}
+  if(st[0]==='LIMIT_HIT'){L.state='drop';L.dropT=0;}
+  if(st[0]==='JAM'){L.state='jam';L.rot=0;}
+  if(st[0]==='DISPENSE_CONFIRMED'){L.irBeam.material.opacity=0;L.ir.material.emissive.setHex(0x00ff88);}
+  if(st[0]==='DISPENSE_FAILED'){L.ir.material.emissive.setHex(0xff3322);}
+  if(st[0]==='VALIDATING'||st[0]==='SCANNING'||st[0]==='DISPENSE_AUTHORIZED'){L.ir.material.emissive.setHex(0x000000);}
+  const wait={VALIDATING:900,SCANNING:900,DISPENSE_AUTHORIZED:700,MOTOR_RUN:2200,LIMIT_HIT:900,WAITING_FOR_SENSOR:1200,DISPENSE_CONFIRMED:3000,JAM:1200,DISPENSE_FAILED:2000}[st[0]]||1000;
+  queue.timer=setTimeout(()=>{queue.i++;playStep();},wait);
+}
+function resetAll(){
+  if(queue&&queue.timer)clearTimeout(queue.timer);if(queue&&queue.resolve)queue.resolve();queue=null;
+  lanes.forEach(L=>{L.state='idle';L.rot=0;L.spin.rotation.x=0;L.pk.position.x=0;L.moving.visible=false;L.moving.position.set(XEND,L.yc+0.3,0);L.moving.visible=false;L.moving.position.set(XEND,L.yc+0.3,0);L.ir.material.emissive.setHex(0);L.irBeam.material.opacity=0;});
+  setState('IDLE');log('Reset.');
+}
+document.getElementById('btnOtc').onclick=()=>{if(!busy){resetAll();log('--- Visual motor demonstration, Lane A ---');sequence('OTC',0);}};
+document.getElementById('btnQr').onclick=()=>refreshQr();
+document.getElementById('btnJam').onclick=()=>{jamNext=!jamNext;document.getElementById('btnJam').textContent='Simulate jam: '+(jamNext?'ON':'OFF');log(jamNext?'Next real dispense will report a jam.':'Jam simulation cancelled.');};
+document.getElementById('btnReset').onclick=()=>{if(!busy)resetAll();};
+
+// The 3D cabinet is an implementation of the same machine protocol as the
+// ESP32 and the 2D screen. The Android app therefore needs no special 3D code.
+async function refreshQr(){
+  try{
+    const d=await api({action:'session'});
+    document.getElementById('qr').innerHTML=d.svg;
+    document.getElementById('code').textContent=d.qr;
+    document.getElementById('connection').textContent='ONLINE · '+machineId+' · QR expires in '+d.expires_in+' seconds';
+    lastQr=Date.now();
+    if(!busy)setState('IDLE');
+  }catch(e){
+    document.getElementById('connection').textContent='OFFLINE: '+e.message;
+    setState('OFFLINE');
+  }
+}
+async function showServerAddress(){
+  try{
+    const d=await fetch('/api/device-info').then(r=>r.json());
+    deviceScreen.textContent='MEDIVEND ONLINE\nAPP SERVER\n'+d.app_address+'\nSame Wi-Fi required';
+  }catch(e){deviceScreen.textContent='MEDIVEND\nServer address unavailable';}
+}
+async function runCommand(command){
+  busy=true;
+  log('Server command '+command.order_id+' received.');
+  try{
+    for(const item of command.items){
+      const laneIdx=Math.max(0,Math.min(lanes.length-1,Number(item.lane_no)-1));
+      for(let n=0;n<Number(item.qty||1);n++){
+        const jam=jamNext;
+        await sequence(jam?'JAM':'QR',laneIdx);
+        if(jam){jamNext=false;document.getElementById('btnJam').textContent='Simulate jam: OFF';throw new Error('limit switch timeout (simulated jam)');}
+      }
+    }
+    await api({action:'report',order_id:command.order_id,result:'success'});
+    log('Dispense confirmed to server.');
+  }catch(e){
+    await api({action:'report',order_id:command.order_id,result:'fail',reason:e.message}).catch(()=>{});
+    log('Dispense failed: '+e.message+'; server started refund handling.');
+  }finally{
+    busy=false;
+    await refreshQr();
+  }
+}
+async function pollServer(){
+  if(busy)return;
+  try{
+    const d=await api({action:'poll'});
+    if(d.command)await runCommand(d.command);
+  }catch(e){document.getElementById('connection').textContent='OFFLINE: '+e.message;setState('OFFLINE');}
+}
+setInterval(pollServer,1000);
+setInterval(()=>api({action:'heartbeat'}).catch(()=>{}),15000);
+setInterval(()=>{if(!busy&&Date.now()-lastQr>50000)refreshQr();},2000);
+refreshQr();
+showServerAddress();
+
+// Exploded view
+let exploded=false,explodeT=0;
+document.getElementById('btnExploded').onclick=()=>{exploded=!exploded;log(exploded?'Exploded view on':'Exploded view off');};
+let doorOpen=false,doorT=0;
+document.getElementById('btnDoor').onclick=()=>{doorOpen=!doorOpen;door.visible=true;log(doorOpen?'Service door opened':'Service door closed');};
+
+// Controls: simple orbit
+let dragging=false,lx=0,ly=0,yaw=0.6,pitch=0.22,dist=20;
+renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;lx=e.clientX;ly=e.clientY;renderer.domElement.setPointerCapture(e.pointerId);});
+renderer.domElement.addEventListener('pointerup',()=>dragging=false);
+renderer.domElement.addEventListener('pointermove',e=>{if(!dragging)return;yaw-=(e.clientX-lx)*0.008;pitch=Math.max(-0.2,Math.min(1.2,pitch+(e.clientY-ly)*0.008));lx=e.clientX;ly=e.clientY;});
+renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();dist=Math.max(9,Math.min(30,dist+e.deltaY*0.01));},{passive:false});
+const chkAuto=document.getElementById('chkAuto');const chkLabels=document.getElementById('chkLabels');
+const chkPath=document.getElementById('chkPath');chkPath.onchange=()=>pathLines.forEach(l=>l.visible=chkPath.checked);
+function holdRepeat(id,fn){
+  const el=document.getElementById(id);let timer=null,rep=null;
+  const stop=()=>{clearTimeout(timer);clearInterval(rep);timer=null;rep=null;};
+  el.addEventListener('pointerdown',e=>{e.preventDefault();fn();timer=setTimeout(()=>{rep=setInterval(fn,60);},250);});
+  el.addEventListener('pointerup',stop);el.addEventListener('pointerleave',stop);el.addEventListener('pointercancel',stop);
+}
+const PAN=0.5, ZOOM=0.6;
+holdRepeat('btnZoomIn',()=>{dist=Math.max(9,dist-ZOOM);});
+holdRepeat('btnZoomOut',()=>{dist=Math.min(30,dist+ZOOM);});
+holdRepeat('btnUp',()=>{target.y=Math.min(5,target.y+PAN);});
+holdRepeat('btnDown',()=>{target.y=Math.max(-5,target.y-PAN);});
+holdRepeat('btnLeft',()=>{target.x=Math.max(-6,target.x-PAN);});
+holdRepeat('btnRight',()=>{target.x=Math.min(6,target.x+PAN);});
+document.getElementById('btnFit').onclick=()=>{target.set(0,-0.7,0);dist=20;yaw=0.6;pitch=0.22;log('View reset to fit whole machine');};
+chkLabels.onchange=()=>labels.forEach(l=>l.el.style.display=chkLabels.checked?'block':'none');
+
+function resize(){const w=host.clientWidth,h=host.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+window.addEventListener('resize',resize);resize();
+
+const clock=new THREE.Clock();
+function frame(){
+  const dt=Math.min(clock.getDelta(),0.05);
+  if(chkAuto.checked)yaw+=dt*0.25;
+  camera.position.set(target.x+dist*Math.cos(pitch)*Math.sin(yaw),target.y+dist*Math.sin(pitch),target.z+dist*Math.cos(pitch)*Math.cos(yaw));
+  camera.lookAt(target);
+  // explode offsets
+  const goal=exploded?1:0;explodeT+=(goal-explodeT)*Math.min(1,dt*5);
+  cab.children.forEach((c,idx)=>{if(c.isGroup&&c!==eb&&c!==panel)c.position.z=explodeT*(idx*0.4);});
+  eb.position.x=explodeT*2.2;eb.position.y=explodeT*0.6;
+  panel.position.z=explodeT*2.0;
+  // door
+  const dgoal=doorOpen?-Math.PI*0.6:0;doorT+=(dgoal-doorT)*Math.min(1,dt*4);doorPivot.rotation.y=doorT;
+  // lanes
+  lanes.forEach(L=>{
+    if(L.state==='run'){
+      // coil spins on its own axis at a steady rate; packets move forward one pitch per full turn
+      L.rot=Math.min(L.rot+dt*2.2,Math.PI*2);
+      L.spin.rotation.x=L.rot;
+      L.pk.position.x=(L.rot/(Math.PI*2))*PITCH;
+      if(L.rot>=Math.PI*2){L.state='idle';}
+    }
+    if(L.state==='jam'){
+      L.rot=Math.min(L.rot+dt*2.2,Math.PI*0.7);
+      L.spin.rotation.x=L.rot;
+    }
+    if(L.state==='drop'){
+      L.dropT+=dt;
+      if(!L.moving.visible){L.moving.visible=true;}
+      const k=Math.min(1,L.dropT/2.6);
+      const P=L.path,n=P.length-1,f=k*n,j=Math.min(Math.floor(f),n-1),u=f-j;
+      L.moving.position.copy(P[j]).lerp(P[j+1],u);
+      L.moving.rotation.z=-0.35*Math.min(1,k*2);
+      if(k>=1){L.irBeam.material.opacity=0.6;L.ir.material.emissive.setHex(0x7b5ea7);L.state='idle';}
+    }
+  });
+  // labels
+  labels.forEach(l=>{if(chkLabels.checked){const v=l.p.clone().project(camera);
+      const x=(v.x*0.5+0.5)*host.clientWidth,y=(-v.y*0.5+0.5)*host.clientHeight;
+      l.el.style.left=x+'px';l.el.style.top=y+'px';l.el.style.display=(v.z<1?'block':'none');}});
+  const sv=deviceScreenPoint.clone().project(camera);
+  deviceScreen.style.left=((sv.x*0.5+0.5)*host.clientWidth)+'px';
+  deviceScreen.style.top=((-sv.y*0.5+0.5)*host.clientHeight)+'px';
+  deviceScreen.style.display=sv.z<1?'block':'none';
+  renderer.render(scene,camera);
+  requestAnimationFrame(frame);
+}
+frame();
+})();
+</script>
+</body>
+</html>

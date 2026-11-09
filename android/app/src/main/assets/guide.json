@@ -1,0 +1,47 @@
+{
+  "start": "q0",
+  "nodes": {
+    "q0": {"q": "What is the main problem?", "options": [
+      {"t": "Fever or body ache", "next": "fever1"},
+      {"t": "Cold, sneezing or itchy allergy", "next": "cold1"},
+      {"t": "Acidity or burning in the stomach", "next": "acid1"},
+      {"t": "Loose motions or dehydration", "next": "loose1"},
+      {"t": "Minor cut or scrape", "next": "cut1"},
+      {"t": "Trouble breathing, chest pain, fainting, or swollen face/throat", "next": "r_emerg"},
+      {"t": "Something else", "next": "r_doctor"}]},
+    "fever1": {"q": "How long have you had the fever?", "options": [
+      {"t": "Less than 3 days", "next": "fever2"}, {"t": "3 days or more", "next": "r_doctor"}]},
+    "fever2": {"q": "Who is it for?", "options": [
+      {"t": "Adult (18+)", "next": "fever3"}, {"t": "Child under 18", "next": "r_child"}]},
+    "fever3": {"q": "Any of these: stiff neck, rash, confusion, severe headache, or very high fever?", "options": [
+      {"t": "Yes", "next": "r_doctor"}, {"t": "No", "next": "r_para"}]},
+    "cold1": {"q": "Any wheezing, trouble breathing, or swelling of lips or face?", "options": [
+      {"t": "Yes", "next": "r_emerg"}, {"t": "No", "next": "cold2"}]},
+    "cold2": {"q": "Who is it for?", "options": [
+      {"t": "Adult (18+)", "next": "r_ceti"}, {"t": "Child under 18", "next": "r_child"}]},
+    "acid1": {"q": "Any chest pain, black stools, vomiting blood, or severe pain?", "options": [
+      {"t": "Yes", "next": "r_emerg"}, {"t": "No", "next": "acid2"}]},
+    "acid2": {"q": "Have the symptoms lasted more than 2 weeks?", "options": [
+      {"t": "Yes", "next": "r_doctor"}, {"t": "No", "next": "r_antacid"}]},
+    "loose1": {"q": "Any of these: very dry mouth, no urine for 8 hours, confusion, or blood in stool?", "options": [
+      {"t": "Yes", "next": "r_doctor"}, {"t": "No", "next": "r_ors"}]},
+    "cut1": {"q": "Is the bleeding heavy, or not stopping after 10 minutes of pressure?", "options": [
+      {"t": "Yes", "next": "r_emerg"}, {"t": "No", "next": "r_antiseptic"}]},
+    "r_para": {"result": "otc", "generic": "Paracetamol", "title": "Suggested: Paracetamol",
+      "text": "Follow the leaflet dose and never exceed the daily maximum. See a doctor if the fever lasts 3 days or more."},
+    "r_ceti": {"result": "otc", "generic": "Cetirizine", "title": "Suggested: Cetirizine",
+      "text": "May cause drowsiness. If lips, face or throat swell, or breathing is hard, call 108 at once."},
+    "r_antacid": {"result": "otc", "generic": "Antacid", "title": "Suggested: Antacid",
+      "text": "See a doctor if symptoms return often or last more than 2 weeks."},
+    "r_ors": {"result": "otc", "generic": "ORS", "title": "Suggested: ORS",
+      "text": "Mix with clean water exactly as printed on the sachet and sip often."},
+    "r_antiseptic": {"result": "otc", "generic": "Povidone", "title": "Suggested: Antiseptic",
+      "text": "Clean the wound, apply as per the label. External use only."},
+    "r_child": {"result": "doctor", "title": "Please talk to a doctor",
+      "text": "Medicine doses for children depend on weight and age. This machine does not guide children's doses."},
+    "r_doctor": {"result": "doctor", "title": "Please see a doctor",
+      "text": "These answers need a doctor's assessment. Visit a clinic or hospital."},
+    "r_emerg": {"result": "emergency", "title": "This may be an emergency",
+      "text": "Call 108 or 112 now. Do not self-medicate. You can also request doctor-approved emergency medicine below."}
+  }
+}
