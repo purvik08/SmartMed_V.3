@@ -1,6 +1,6 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MediVend machine</title>
+<title>SmartMed machine</title>
 <style>
 body{font-family:system-ui,sans-serif;background:#0b1f1d;color:#e6fffb;text-align:center;margin:0;padding:20px}
 .card{background:#12332f;border-radius:16px;padding:18px;max-width:460px;margin:0 auto 14px}
@@ -10,8 +10,8 @@ code{word-break:break-all;font-size:12px;color:#9be}
 button{padding:10px 16px;border-radius:10px;border:0;font-size:15px}
 pre{text-align:left;font-size:12px;white-space:pre-wrap;color:#9bd}
 </style></head><body>
-<div class="card"><h2 id="title">MediVend machine</h2><div id="state" class="s">BOOTING</div><div id="note"></div></div>
-<div class="card"><div id="qr"></div><p>Scan with the MediVend app<br><small>QR is single-use and refreshes about every 50 s</small></p><code id="code"></code></div>
+<div class="card"><h2 id="title">SmartMed machine</h2><div id="state" class="s">BOOTING</div><div id="note"></div></div>
+<div class="card"><div id="qr"></div><p>Scan with the SmartMed app<br><small>QR is single-use and refreshes about every 50 s</small></p><code id="code"></code></div>
 <div class="card"><button id="jam">Simulate jam on next dispense: OFF</button><pre id="log"></pre></div>
 <script>
 // This page plays the role of the ESP32 firmware: it only talks to /api/machine, exactly like the real hardware will.
@@ -22,7 +22,7 @@ const $ = (x) => document.getElementById(x);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (m) => { $('log').textContent = new Date().toLocaleTimeString() + '  ' + m + '\n' + $('log').textContent.split('\n').slice(0, 10).join('\n'); };
 const setState = (s, n = '') => { $('state').textContent = s; $('note').textContent = n; };
-$('title').textContent = 'MediVend machine ' + id;
+$('title').textContent = 'SmartMed machine ' + id;
 
 async function call(body) {
   const r = await fetch('/api/machine', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-machine-key': key }, body: JSON.stringify({ machine_id: id, ...body }) });

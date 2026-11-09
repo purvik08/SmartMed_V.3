@@ -31,7 +31,7 @@ fun LoginScreen() {
             Modifier.padding(inner).fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
             verticalArrangement = Arrangement.Center,
         ) {
-            Text("MediVend", fontSize = 30.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Text("SmartMed", fontSize = 30.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             Text("Doctor-authorised medicine, 24x7 (offline prototype)")
             Gap(24)
             Field("Server address (laptop IP:port)", server, { server = it; sent = false }, hint = "192.168.1.5:8080  (emulator: 10.0.2.2:8080)")

@@ -25,7 +25,7 @@ fun PatientShell() {
     val icons = listOf("🏠", "🗺", "🧾", "🪪")
     Scaffold(
         topBar = {
-            TopBar("MediVend", back = false) {
+            TopBar("SmartMed", back = false) {
                 TextButton(onClick = { Nav.push(Screen.Profile) }) { Text("Profile") }
                 TextButton(onClick = { logout(ctx) }) { Text("Logout") }
             }
@@ -75,7 +75,7 @@ fun HomeTab() {
         }
     }
     Gap(12)
-    Text("This is guidance, not a medical diagnosis. MediVend is a prototype and not a medical device.", fontSize = 12.sp, color = Color.Gray)
+    Text("This is guidance, not a medical diagnosis. SmartMed is a prototype and not a medical device.", fontSize = 12.sp, color = Color.Gray)
 }
 
 @Composable

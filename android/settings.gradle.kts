@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "MediVend"
+rootProject.name = "SmartMed"
 include(":app")

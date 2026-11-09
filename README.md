@@ -1,96 +1,368 @@
-# MediVend: fully offline prototype
+# SmartMed
 
-Everything runs on your own laptop and your own Wi-Fi or phone hotspot. **No internet is needed to run it**
-(no cloud, no Docker, no map tiles, no SMS, no npm packages).
+> **Offline-first medicine-access prototype for supervised dispensing.**
 
+SmartMed is a local-network prototype that connects an Android application, a clinical review workflow, pharmacy operations, and a medicine-dispensing machine. It explores how essential over-the-counter (OTC), prescription, and time-sensitive emergency medicine workflows could be coordinated where reliable internet access is limited or unavailable.
+
+The project runs on a laptop and a private Wi-Fi network or phone hotspot. It does not require cloud hosting, Docker, an external database, SMS, map services, or installed Node packages at runtime.
+
+## Important safety and scope notice
+
+SmartMed is a **demonstration prototype**, not a medical device, pharmacy system, emergency service, payment product, or clinical decision-support system. It must not be used to diagnose, prescribe, dispense, or administer real medicines. Use sealed empty boxes or placebos only during demonstrations.
+
+Its seeded medicine catalogue, prices, dosage text, age limits, allergy tags, and emergency formulary are illustrative. Any real deployment would require clinical governance, licensed pharmacy participation, pharmacist and physician review, regulatory approval, validated hardware, security testing, accessibility assessment, real authentication and payment integrations, and local legal compliance.
+
+## Contents
+
+- [Project goals](#project-goals)
+- [What is included](#what-is-included)
+- [System architecture](#system-architecture)
+- [End-to-end workflows](#end-to-end-workflows)
+- [Safety, controls, and data handling](#safety-controls-and-data-handling)
+- [Applications and social impact](#applications-and-social-impact)
+- [Technology stack](#technology-stack)
+- [Getting started](#getting-started)
+- [Demo accounts and scenarios](#demo-accounts-and-scenarios)
+- [Machine integration contract](#machine-integration-contract)
+- [Testing and operational checks](#testing-and-operational-checks)
+- [Repository guide](#repository-guide)
+- [Current limitations and roadmap](#current-limitations-and-roadmap)
+
+## Project goals
+
+SmartMed demonstrates a controlled last-mile medicine-access model with five goals:
+
+1. **Local resilience** — keep the essential workflow available over a local network when public internet connectivity is unreliable.
+2. **Appropriate access** — distinguish routine OTC access from prescription-only and emergency pathways.
+3. **Human clinical oversight** — route prescription and emergency decisions through a verified doctor role in the prototype.
+4. **Traceable dispensing** — record the order, payment state, stock lane, dispensing event, refund outcome, and audit event.
+5. **Operational readiness** — give a worker role tools to inspect lanes, refill stock with batch/expiry information, and register machines.
+
+## What is included
+
+### Patient Android app
+
+- Offline-local login with a demo OTP.
+- Profile capture for date of birth, allergies, conditions, and current medicines.
+- Medicine search, tier awareness, basket, machine selection, and mock payment.
+- QR-based collection from a selected machine.
+- Emergency request creation and live status tracking.
+- Emergency-pass application with supporting document upload.
+- Use of an approved emergency pass when declared red-flag symptoms match its conditions.
+
+### Doctor Android app
+
+- Availability control and an emergency-case queue.
+- Case acceptance, patient-context review, approval or rejection of emergency packs, and follow-up marking.
+- Prescription issuance for Tier 2 medicines.
+- Review, issuance, rejection, and revocation of patient emergency passes.
+- Backup-panel escalation after an unanswered emergency request has waited for 60 seconds.
+
+### Worker Android app
+
+- Machine and lane visibility.
+- Lane refills with medicine, quantity, batch, and expiry data.
+- New-machine registration with six initial lanes and a generated machine API key.
+
+### Local backend and machine views
+
+- Node.js HTTP API and file-backed SQLite database.
+- Built-in 2D dispenser interface and connected 3D cabinet simulation.
+- Machine heartbeats, short-lived QR sessions, command polling, dispense-result reporting, and simulated jams.
+- Automatic stock restoration, refund record creation, and support-ticket creation when a dispense fails or times out.
+
+## System architecture
+
+```text
+                         private Wi-Fi / phone hotspot
+
+ ┌────────────────┐        REST API         ┌────────────────────────────┐
+ │ Android app    │ ◄─────────────────────► │ SmartMed local server       │
+ │ Patient        │                          │ Node.js + built-in SQLite  │
+ │ Doctor         │                          │ rules engine + audit trail  │
+ │ Worker         │                          └──────────────┬─────────────┘
+ └────────────────┘                                         │
+                                                           HTTP
+                                                            │
+                                             ┌──────────────▼─────────────┐
+                                             │ Machine interface           │
+                                             │ 2D simulator / 3D model /   │
+                                             │ future ESP32-class device   │
+                                             └────────────────────────────┘
 ```
-server/    Local server (Node.js, built-in SQLite). API for the app + the machine screen. Tested.
-android/   Android Studio project (Kotlin, Jetpack Compose): Patient, Doctor and Worker in one app.
+
+The server is the source of truth. The Android app is a client interface, while the machine interface executes only a server-issued command for its authenticated machine ID. Eligibility and stock are checked again immediately before dispensing rather than relying on an earlier client-side decision.
+
+### Core records
+
+The local SQLite database stores users and roles, medicine catalogue entries, machines and lanes, QR sessions, orders, payments, dispense events, refunds, support tickets, emergency requests, prescriptions, emergency passes, uploaded documents, reminders, and audit records. The audit table is protected by database triggers that reject updates and deletes, making it append-only within this prototype.
+
+## End-to-end workflows
+
+### 1. Standard OTC purchase
+
+```text
+Patient profile → Browse Tier 1 medicine → Select an online machine
+→ Create order → Mock payment → Scan machine QR → Server validates again
+→ Lane command → Sensor/simulator result → Dispensed or refunded
 ```
-Prototype, not a medical device. Use empty sealed boxes or placebo packs only. Catalogue doses, prices and
-the Tier 3 emergency formulary are placeholders that a licensed doctor and pharmacist must review.
 
-## 1. Start the server (laptop)
-Install **Node.js 22.13 or newer** once (nodejs.org). Then:
+Tier 1 medicines are intended for OTC access in the prototype. The server checks the customer profile, age rule, allergy tags, per-order limits, machine availability, lane stock, and expiry before an order is created. It repeats relevant checks at payment and collection time.
+
+### 2. Prescription medicine purchase
+
+```text
+Doctor issues Tier 2 e-prescription → Patient selects covered medicine
+→ Server verifies prescription, validity, quantities, and one-time use
+→ Payment and QR collection → Successful dispense marks prescription used
 ```
-cd server
-node --no-warnings server.mjs        (or double-click start-server.bat / run ./start-server.sh)
+
+Tier 2 items require a valid, unused prescription belonging to the patient. An order may not combine medicine tiers; prescription medicines remain separate from OTC and emergency orders.
+
+### 3. Live emergency request
+
+```text
+Patient requests an emergency pack and describes the situation
+→ Doctor queue receives the case → Doctor accepts and decides
+→ Patient pays → Patient scans machine QR → Machine dispenses
+→ Follow-up reminder is created
 ```
-On Windows, the quickest demo option is to double-click **`start-medivend.bat`** in the project folder. It starts the
-server if it is not already running, then opens the connected M1 3D simulation in your default browser.
-It prints your laptop's address, for example `192.168.1.5:8080`, and creates `server/data/medivend.db`
-with demo data on first run. Delete `server/data/medivend.db*` to reset everything.
-Windows: if asked, allow Node.js through the firewall on **Private** networks so the phone can reach it.
 
-Check the whole backend any time: `cd server && node test/smoke.mjs` (19 end-to-end checks, about 15 s).
+Tier 3 emergency packs require a live doctor approval or an active emergency pass. A doctor approval is valid for one hour. The prototype limits emergency/pass dispensing to one completed or in-progress order per patient in 24 hours. If no clinician responds within five minutes, the patient is instructed to call emergency services; the app prominently offers 108 and 112 dial actions. This is a workflow demonstration and does not replace emergency care.
 
-## 2. Open the machine screen (laptop browser)
-`http://localhost:8080/machine/M1?key=demo-key-1`
+### 4. Pre-authorised emergency pass
 
-This page acts as the vending machine: it shows the single-use QR, runs the dispense state machine, and has a
-**Simulate jam** button to demo the automatic refund. Machines M2 and M3 work the same way
-(`/machine/M2?key=demo-key-2`, `/machine/M3?key=demo-key-3`). Keep it open: an offline machine blocks orders.
-Stock per machine: M1 has Paracetamol, ORS, Cetirizine, Adrenaline, Salbutamol, Aspirin. M2 has Paracetamol, Antacid,
-Povidone-iodine, Amoxicillin (Rx), Glucose, Isosorbide. M3 is a light machine.
+```text
+Patient uploads report/prescription → Applies for pass → Doctor reviews
+→ Doctor issues a time-limited, limited-use pass with symptom triggers
+→ Patient declares matching red flags → QR collection → Usage is logged
+```
 
-### Connected 3D prototype
-`http://localhost:8080/simulation/M1?key=demo-key-1`
+A pass may contain only Tier 3 emergency items. It has a doctor-selected validity period (up to 90 days), one or two uses, item quantity limits, and required red-flag symptom keys. Doctors can reject or revoke a pass, and successful use generates patient and clinician follow-up reminders.
 
-This is the cabinet's interactive 3D prototype, connected to exactly the same local machine API as the Android app.
-Keep either the 2D machine screen or this 3D page open for the selected machine (not both): it sends heartbeats, issues
-the short-lived QR, receives the app's dispense command, animates the commanded lanes, and reports the sensor result.
-Use the **Simulate jam** control before a dispense to demonstrate the automatic refund flow. Change `M1` and the `key`
-in the URL for M2 or M3.
+### 5. Dispense failure and recovery
 
-## 3. Build the app (Android Studio)
-1. Open Android Studio (Koala or newer) > **Open** > choose the `android` folder.
-2. Let it **Sync**. This is the **only step that needs internet**, once, to download Gradle and the libraries.
-   After a successful sync you can switch Gradle to **Offline mode** (Settings > Build > Gradle) and work offline.
-   If it says the Gradle wrapper is missing or offers to upgrade plugins, accept its suggestion.
-3. Run on an emulator or a real phone (USB debugging).
-4. On the login screen set **Server address**:
-   - Emulator: `10.0.2.2:8080`
-   - Real phone: the laptop address the server printed (phone and laptop on the same Wi-Fi or hotspot; the network
-     does not need internet).
-5. Demo logins (type 10 digits, OTP `123456`): patient `9000000001` / `9000000002`, doctor `9000000011`,
-   backup doctor `9000000012`, worker `9000000021`. Use two devices (or emulator + phone) for patient + doctor.
-6. As a patient, open **Profile** and set date of birth first (age rules need it).
+```text
+Paid order → QR redeemed → Stock reserved → Command sent to machine
+→ success report: complete order
+→ failure or no report within 60 seconds: restore stock, refund, ticket
+```
 
-Emulator QR tip: the emulator camera cannot easily see your screen. On the Collect screen, paste the QR text shown
-under the machine page QR into the box and press Start dispensing.
+The machine page can simulate a jam. A failed or unconfirmed dispense is handled idempotently: the pending command is closed, reserved stock is returned to its lane, the mock captured payment becomes refunded, a refund record is written, and a support ticket is created. This model is designed to make the physical hand-off explicit rather than assuming a paid order was fulfilled.
 
-## Demo script
-- **OTC:** Search "ORS" > add > cart > pay (mock UPI) > scan machine QR > the machine page dispenses.
-- **Emergency:** Home > EMERGENCY > situation + pack (machine M1 or M2 must stock it) > doctor device shows the alert >
-  Accept > Approve > patient pays and collects. After 60 s the backup-panel doctor can see it; after 5 min with no
-  doctor the patient is told to call 108.
-- **Rx:** Doctor > Rx tab issues an e-prescription by patient phone > patient buys Amoxicillin on machine M2 (one-time use).
-- **Pass:** Patient > Pass > apply with a photo > Doctor > Passes > review, issue > Patient "Use" > no doctor wait.
-- **Failure:** tick Simulate jam on the machine page, dispense: automatic refund + support ticket + stock restored.
-- **Worker:** refill lanes with batch and expiry, LOW and expiring flags, register a new machine.
+### 6. Inventory operations
 
-## What changed from the cloud version
-| Before | Now |
+```text
+Worker signs in → Opens machine/lane → Records refill quantity, batch, expiry
+→ Server updates lane → Orders select non-expired stock, earliest expiry first
+```
+
+The inventory planner blocks offline machines and selects a lane only when the required quantity is available and the expiry date has not passed. Where multiple suitable lanes exist, it selects the earliest-expiring one first.
+
+## Safety, controls, and data handling
+
+| Control | Prototype behaviour |
 |---|---|
-| Supabase + Docker | Node.js server with a built-in SQLite file |
-| Phone SMS OTP | Fixed demo OTP 123456 (no SMS offline) |
-| Flutter + pub packages + OSM tiles | Native Android Studio app, schematic offline map from GPS pins |
-| Optional MQTT broker | Machine talks plain HTTP to the same server (an ESP32 can do the same) |
-| Cloud storage for reports | Files saved in `server/data/uploads` |
+| Role separation | Patient, doctor, and worker roles expose separate API paths and app experiences. |
+| Profile safeguards | Age and recorded allergy checks are enforced server-side. |
+| Medicine tiers | Tier 1 = OTC, Tier 2 = prescription, Tier 3 = emergency. Tiers cannot be mixed in one order. |
+| Emergency controls | Live approval or active pass, approval expiry, red-flag match, quantity limits, and a 24-hour limit are checked by the server. |
+| QR collection | A QR contains a machine ID and a single-use token that expires after 60 seconds. |
+| Machine availability | Machines heartbeat every 15 seconds; a machine is treated as offline after two minutes without a heartbeat. |
+| Inventory | Quantity is reserved atomically before a command; expired lanes are excluded; failed dispenses restore stock. |
+| Traceability | Orders, payments, commands, dispense events, refunds, tickets, and audit events are persisted locally. |
+| Document access | Patient documents are stored locally and may be retrieved only by their owner or an authorised doctor with a relevant case/pass relationship. |
 
-Rules are unchanged: the server alone decides eligibility (tiers, age, allergies, Rx one-time use, doctor approval
-valid 1 h, pass red flags, 24 h emergency limit, stock, expiry) and re-checks at order, payment and dispense time.
-QR tokens are single-use and last 60 s. Failed or unconfirmed dispenses refund automatically. The audit log is
-append-only (database triggers).
+### Security boundaries
 
-## Machine protocol (for the ESP32-S3 later)
-`POST /api/machine` with header `x-machine-key`, JSON `{machine_id, action}`:
-`session` (returns QR text), `heartbeat` (every 15 s), `poll` (returns `{command:{order_id, items:[{lane_no, qty}]}}`),
-`report` (`{order_id, result:'success'|'fail', reason}`). `server/machine.html` is a working reference.
+This implementation is intentionally suitable only for a controlled demonstration network. It uses HTTP cleartext traffic, a fixed demo OTP (`123456`), locally persisted bearer tokens, mock payment capture, and per-machine API keys passed in a request header. These are not production authentication, encryption, key management, payment, or privacy controls.
 
-## Honest status
-- **Server:** run and tested here (19 end-to-end checks pass; the QR encoder was verified by decoding with OpenCV).
-- **Android app:** written carefully but **not compiled here** (no Android SDK in my environment). Expect a few small
-  compile or version fixes on first build. Paste any error and it is quick to resolve.
-- Not built: Hindi/Gujarati text, reminder screens (rows are saved), video consults, admin dashboard, ESP32 firmware.
-- Real use would need a licensed pharmacy partner, a doctor-reviewed formulary, real payments and an SMS/auth provider.
+For real use, replace these mechanisms with TLS/mTLS, secure device identity and key rotation, an audited identity provider and OTP service, encrypted storage, least-privilege access controls, session expiry/revocation, secure hardware firmware, payment-provider callbacks, monitoring, backups, incident response, and jurisdiction-specific health-data governance.
+
+## Applications and social impact
+
+### Potential applications
+
+- **Transport hubs and highway stops:** improve access to basic supplies during travel, subject to pharmacy and clinical oversight.
+- **Rural and low-connectivity settings:** explore local-first workflows that do not depend on continuous public internet access.
+- **Hospital peripheries and campuses:** model supervised collection points for approved, prepacked items.
+- **Disaster-relief or temporary clinics:** demonstrate a resilient local coordination flow where connectivity is constrained.
+- **Healthcare operations training:** simulate the interaction between patient, clinician, inventory worker, and dispenser without handling real medicines.
+
+### Potential positive impact
+
+The model could reduce travel burden for routine access, make stock and expiry information more visible, create a verifiable chain from clinical decision to physical dispensing, and preserve continuity on local networks. The pass workflow also illustrates how a clinician-approved plan could reduce delay for narrowly defined, previously assessed emergency needs.
+
+### Equity, ethical, and safety considerations
+
+Technology must not shift clinical responsibility onto users or create an unsafe substitute for urgent care. A deployment would need inclusive language and accessibility design, transparent consent, clear emergency escalation, affordability review, bias evaluation, pharmacy accountability, robust medicine quality controls, community engagement, and independent clinical and regulatory review. The system should complement—not replace—clinicians, pharmacists, ambulance services, and public health infrastructure.
+
+## Technology stack
+
+| Layer | Implementation |
+|---|---|
+| Mobile app | Kotlin, Jetpack Compose, Android SDK 24+ |
+| QR scanning | ZXing Android Embedded |
+| Backend | Node.js 22.13+ using only built-in modules |
+| Database | Node built-in SQLite (`node:sqlite`) in WAL mode |
+| API | Local REST-style HTTP JSON service on port `8080` |
+| Machine demo | Browser-based 2D machine page and Three.js 3D simulation |
+| Runtime model | Laptop server plus devices on the same Wi-Fi/hotspot |
+
+## Getting started
+
+### Prerequisites
+
+- Node.js **22.13 or newer** for the local server.
+- Android Studio Koala or newer, a physical Android device, or an emulator to run the app.
+- A shared Wi-Fi network or phone hotspot for a physical phone and laptop. Internet access is not required after Android dependencies have been downloaded once.
+
+### 1. Start the local server
+
+From the repository root:
+
+```powershell
+cd server
+node --no-warnings server.mjs
+```
+
+On Windows, you can instead double-click [`start-medivend.bat`](./start-medivend.bat). It starts the server when port `8080` is free and opens the M1 3D simulation. On first start, the server creates `server/data/medivend.db` and seeds sample users, machines, lanes, and medicines.
+
+Allow Node.js through the Windows firewall on **Private** networks when prompted so a phone can reach the laptop. The startup output displays usable LAN addresses.
+
+To reset the demonstration data, stop the server and remove the generated `server/data/medivend.db` plus its associated SQLite WAL/SHM files. This deletes all local demo records and uploaded documents.
+
+### 2. Open a machine interface
+
+Keep one machine interface open for the machine you intend to use. It supplies the heartbeat, fresh QR code, command polling, and dispense result.
+
+| Interface | M1 URL |
+|---|---|
+| 2D machine screen | `http://localhost:8080/machine/M1?key=demo-key-1` |
+| Connected 3D simulation | `http://localhost:8080/simulation/M1?key=demo-key-1` |
+
+M2 uses `key=demo-key-2` and M3 uses `key=demo-key-3`. Do not leave the 2D and 3D views open for the same machine simultaneously, because both represent that machine and can poll its command queue.
+
+### 3. Build and run the Android app
+
+1. Open the [`android`](./android) folder in Android Studio.
+2. Allow Gradle to sync. The initial dependency download requires internet access; subsequent work can use Gradle Offline mode.
+3. Run the app on an emulator or Android device.
+4. At login, configure the server address:
+   - Android Emulator: `10.0.2.2:8080`
+   - Physical phone: the `LAN-IP:8080` address printed by the server, with the phone and laptop on the same local network.
+5. Sign in using a demo account and OTP `123456`.
+6. For age-restricted catalogue items, enter date of birth in the patient profile before ordering.
+
+For an emulator, the camera may not be able to scan the QR displayed on the same computer. Copy the QR text shown beneath the browser machine QR into the app's collection screen and select **Start dispensing**.
+
+## Demo accounts and scenarios
+
+All demonstration accounts use OTP `123456`.
+
+| Role | Phone number | Purpose |
+|---|---:|---|
+| Patient | `9000000001` | Primary patient workflow |
+| Patient | `9000000002` | Second patient / multi-device demonstrations |
+| Doctor | `9000000011` | Standard clinical queue and prescriptions |
+| Backup doctor | `9000000012` | Emergency escalation queue after 60 seconds |
+| Worker | `9000000021` | Refill and machine administration |
+
+Suggested walkthroughs:
+
+1. **OTC:** Search for ORS, add it to the basket, choose an online machine, use mock payment, scan the machine QR, and observe the dispense completion.
+2. **Prescription:** Sign in as the doctor and issue an Amoxicillin prescription to a patient. As that patient, select machine M2, purchase the covered item, and collect it. The prescription becomes one-time used after successful dispensing.
+3. **Emergency:** Submit an emergency request from a patient account. On a doctor device, accept and approve it; return to the patient to pay and collect. Use the backup doctor after 60 seconds to demonstrate escalation.
+4. **Pass:** Upload a sample document, apply for an emergency pass, issue it from the doctor account, then use the pass from the patient account with a matching declared red flag.
+5. **Recovery:** Activate **Simulate jam** on a machine view before collection. The server should restore reserved stock and create refund and support-ticket records after the failed result.
+6. **Operations:** Sign in as the worker, update a lane with a batch and expiry date, and register a new machine.
+
+## Machine integration contract
+
+A future hardware controller can use the same endpoint as the browser simulation:
+
+```text
+POST /api/machine
+Header: x-machine-key: <machine API key>
+Body: { "machine_id": "M1", "action": "..." }
+```
+
+| Action | Purpose | Key response / request fields |
+|---|---|---|
+| `heartbeat` | Announce that the machine is reachable. | `{ ok: true }` |
+| `session` | Request a fresh collection QR session. | Returns QR text and expiry information. |
+| `poll` | Read a pending dispense command for that machine. | Returns `command` with `order_id` and lane/quantity items, when available. |
+| `report` | Confirm the physical result of a command. | Include `order_id`, `result: "success" | "fail"`, and an optional `reason`. |
+
+A real controller should poll or use a secured event channel, actuate only the lane/quantity command received for its own authenticated ID, validate its sensors, and report an unambiguous result. It must be engineered with mechanical interlocks, tamper resistance, secure firmware updates, offline-safe retry behavior, inventory reconciliation, and regulated validation; the web simulator does not provide these properties.
+
+## Testing and operational checks
+
+Run the backend smoke suite from the `server` directory:
+
+```powershell
+node test/smoke.mjs
+```
+
+The suite exercises the primary API workflow, including authentication, order eligibility, machine interaction, and recovery behavior. It uses demonstration data and does not constitute clinical, hardware, penetration, performance, accessibility, or regulatory validation.
+
+Before a demonstration, confirm that:
+
+- the server is running and the intended machine view is open;
+- the app points at the correct local server address;
+- the selected machine is marked online;
+- the patient profile includes a date of birth when needed;
+- only one browser machine view is active per machine; and
+- the demo uses placebos or empty sealed packages rather than real medicines.
+
+## Repository guide
+
+```text
+SmartMed_V.3/
+├── android/                         Android Studio project
+│   └── app/src/main/java/com/medivend/app/
+│       ├── PatientScreens.kt         Patient catalogue, basket, profile, guide
+│       ├── DoctorScreens.kt          Clinical queue, passes, prescriptions
+│       ├── WorkerScreens.kt          Refills and machine registration
+│       ├── EmergencyScreens.kt       Emergency and collection workflows
+│       ├── Api.kt                    Local API client and local preferences
+│       └── MainActivity.kt           App entry point and navigation root
+├── server/
+│   ├── server.mjs                    HTTP routes and domain operations
+│   ├── rules.mjs                     Eligibility, safety, and stock rules
+│   ├── lib.mjs                       SQLite schema, seed data, shared helpers
+│   ├── machine.html                  Connected 2D machine simulator
+│   ├── 1_3D_Model/                   Connected Three.js machine model
+│   └── test/smoke.mjs                Backend smoke checks
+├── start-medivend.bat                Windows convenience launcher
+└── README.md                         Project documentation
+```
+
+Runtime data is generated under `server/data/` and is intentionally excluded from source control. It contains the SQLite database and locally uploaded demonstration documents.
+
+## Current limitations and roadmap
+
+### Known limitations
+
+- The Android app has been compiled, installed, and tested. Keep the Android SDK, JDK, and Gradle versions aligned with the project configuration when rebuilding it on another machine.
+- The authentication OTP and payment flow are deliberately mocked.
+- Data, uploads, API traffic, and tokens are local-prototype implementations and are not production-secure.
+- The 2D/3D machine pages simulate a dispenser; no ESP32 firmware, certified sensors, or production hardware control is included.
+- No admin dashboard, multilingual UI, video consultation, notification delivery, or real map/routing service is implemented.
+- Reminder rows are recorded but no reminder-delivery service is included.
+- The medicine catalogue and clinical rules are demo data only and are not medical advice.
+
+### Recommended next steps
+
+1. Validate the Android build on target devices and add automated mobile tests.
+2. Co-design the formulary, escalation rules, and user experience with licensed clinicians, pharmacists, patients, and regulators.
+3. Replace demo identity, payments, and cleartext local HTTP with production-grade security and privacy controls.
+4. Implement and test a secured hardware controller with sensor reconciliation, interlocks, diagnostics, and remote maintenance processes.
+5. Add role administration, inventory reconciliation, audit export, backups, observability, accessibility support, and multilingual content.
+6. Conduct threat modelling, clinical safety analysis, usability testing, hardware reliability testing, and formal regulatory review before any real-world trial.
+
+## License and contribution
+
+No license file is currently included. Until a license is added by the project owner, treat the source as **all rights reserved** and request permission before reuse or redistribution.
+
+When contributing, keep safety-critical rules on the server, add tests for changed workflow logic, avoid committing generated `server/data/` files or secrets, and document any change that affects clinical review, medication eligibility, stock accounting, or hardware behavior.

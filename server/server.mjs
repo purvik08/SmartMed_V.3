@@ -1,4 +1,4 @@
-// MediVend local server: REST API for the Android app, machine endpoint, and the machine simulator page.
+// SmartMed local server: REST API for the Android app, machine endpoint, and the machine simulator page.
 // Runs fully offline on your laptop. No npm packages. Needs Node.js 22.13 or newer.
 import http from 'node:http';
 import fs from 'node:fs';
@@ -194,7 +194,7 @@ route('POST', '/api/orders/:id/pay', ({ user, params }) => {
 
 route('POST', '/api/orders/:id/dispense', ({ user, params, body }) => {
   const m = /^medivend:\/\/m\/([A-Za-z0-9_-]+)\?t=([0-9a-f]{8,64})$/i.exec(String(body.qr ?? '').trim());
-  need(m, 400, 'That is not a MediVend machine QR', 'BAD_QR');
+  need(m, 400, 'That is not a SmartMed machine QR', 'BAD_QR');
   const [, qrMachine, tok] = m;
   const o = ownOrder(user, params.id);
   if (['dispensing', 'dispensed'].includes(o.status)) return { status: o.status }; // idempotent
@@ -488,8 +488,8 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
   if (req.method === 'GET' && url.pathname === '/') {
     const ips = lanIps();
-    return send(200, `<!doctype html><meta charset=utf-8><title>MediVend server</title><body style="font-family:system-ui;max-width:640px;margin:32px auto">
-<h2>MediVend local server is running</h2><p>Enter this in the Android app (Server settings): <b>${ips.map((i) => `${i}:${PORT}`).join(' or ') || 'localhost:' + PORT}</b>
+    return send(200, `<!doctype html><meta charset=utf-8><title>SmartMed server</title><body style="font-family:system-ui;max-width:640px;margin:32px auto">
+<h2>SmartMed local server is running</h2><p>Enter this in the Android app (Server settings): <b>${ips.map((i) => `${i}:${PORT}`).join(' or ') || 'localhost:' + PORT}</b>
 (emulator: <b>10.0.2.2:${PORT}</b>)</p><p>Machine screens: ${all('SELECT id, api_key FROM machines').map((m) => `<a href="/machine/${m.id}?key=${m.api_key}">${m.id}</a>`).join(' · ')}</p>
 <p>Connected 3D prototype: ${all('SELECT id, api_key FROM machines').map((m) => `<a href="/simulation/${m.id}?key=${m.api_key}">${m.id}</a>`).join(' · ')}</p>
 <p>Demo logins (OTP ${CFG.otp}): patient 9000000001, doctor 9000000011, backup doctor 9000000012, worker 9000000021.</p></body>`, 'text/html');
@@ -529,7 +529,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`MediVend server on port ${PORT}. Data folder: ${DATA_DIR}`);
+  console.log(`SmartMed server on port ${PORT}. Data folder: ${DATA_DIR}`);
   console.log('Put one of these in the Android app (Server settings):');
   for (const ip of lanIps()) console.log(`  ${ip}:${PORT}`);
   console.log(`  10.0.2.2:${PORT}   (Android emulator)`);

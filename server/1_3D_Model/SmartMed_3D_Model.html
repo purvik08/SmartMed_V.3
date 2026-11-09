@@ -46,7 +46,7 @@ label.chk{font-size:13px;display:flex;gap:8px;align-items:center;color:var(--ink
   <aside>
     <div class="card">
       <h3>Connected machine</h3>
-      <p id="connection">Connecting to local MediVend server…</p>
+      <p id="connection">Connecting to local SmartMed server…</p>
       <p style="margin-top:8px">Scan or paste this one-time QR in the Android app:</p>
       <div id="qr" aria-label="Machine QR code"></div>
       <code id="code" style="display:block;word-break:break-all;font-size:11px;color:var(--gr)"></code>
@@ -261,7 +261,7 @@ const labelDefs=[
 ];
 const labels=labelDefs.map(d=>{const el=document.createElement('div');el.textContent=d.t;el.style.cssText="position:absolute;font:12px Arial;color:var(--ink);background:var(--pn);border:1px solid var(--ln);padding:3px 7px;border-radius:6px;pointer-events:none;white-space:nowrap;transform:translate(-50%,-50%)";host.appendChild(el);return {el,p:d.p};});
 const deviceScreen=document.createElement('div');
-deviceScreen.id='deviceScreen';deviceScreen.textContent='MEDIVEND\nFinding local IP…';host.appendChild(deviceScreen);
+deviceScreen.id='deviceScreen';deviceScreen.textContent='SMARTMED\nFinding local IP…';host.appendChild(deviceScreen);
 const deviceScreenPoint=new THREE.Vector3(ex,3.2,D/2+0.24);
 
 // Animation / sequence logic
@@ -275,7 +275,7 @@ function sequence(name,laneIdx,opts){
   queue={name,lane:L,steps:[]};
   if(name==='OTC'){
     queue.steps=[
-      ['VALIDATING','OTC request screened by the local MediVend safety engine'],
+      ['VALIDATING','OTC request screened by the local SmartMed safety engine'],
       ['DISPENSE_AUTHORIZED','Command sent to ESP32-S3 for '+L.tag],
       ['MOTOR_RUN','BO motor turns coil one turn; one packet advances one pitch'],
       ['LIMIT_HIT','Limit switch tripped at home position; motor stops'],
@@ -347,8 +347,8 @@ async function refreshQr(){
 async function showServerAddress(){
   try{
     const d=await fetch('/api/device-info').then(r=>r.json());
-    deviceScreen.textContent='MEDIVEND ONLINE\nAPP SERVER\n'+d.app_address+'\nSame Wi-Fi required';
-  }catch(e){deviceScreen.textContent='MEDIVEND\nServer address unavailable';}
+    deviceScreen.textContent='SMARTMED ONLINE\nAPP SERVER\n'+d.app_address+'\nSame Wi-Fi required';
+  }catch(e){deviceScreen.textContent='SMARTMED\nServer address unavailable';}
 }
 async function runCommand(command){
   busy=true;

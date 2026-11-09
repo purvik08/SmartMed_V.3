@@ -310,7 +310,7 @@ fun CheckoutDialog(co: Checkout) {
     AlertDialog(
         onDismissRequest = { co.pending = null },
         title = { Text("Mock UPI payment") },
-        text = { Text("Pay ${inr(o.d("total"))} to MediVend?\n\nPrototype: no real money moves.") },
+        text = { Text("Pay ${inr(o.d("total"))} to SmartMed?\n\nPrototype: no real money moves.") },
         confirmButton = {
             Button(onClick = {
                 co.pending = null

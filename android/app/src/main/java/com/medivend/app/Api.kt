@@ -31,7 +31,7 @@ fun jsonArr(items: List<Any?>): JSONArray {
     return a
 }
 
-/** Talks to the MediVend server on your own Wi-Fi / hotspot. Nothing leaves the local network. */
+/** Talks to the SmartMed server on your own Wi-Fi / hotspot. Nothing leaves the local network. */
 object Api {
     var baseUrl: String = "http://10.0.2.2:8080"
     var token: String? = null

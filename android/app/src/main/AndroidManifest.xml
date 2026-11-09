@@ -7,7 +7,7 @@
 
     <application
         android:allowBackup="false"
-        android:label="MediVend"
+        android:label="SmartMed"
         android:usesCleartextTraffic="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
